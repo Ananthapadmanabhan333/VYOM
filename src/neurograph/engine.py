@@ -50,8 +50,16 @@ MODES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-MAX_HISTORY_TURNS = 6
-MAX_PROMPT_TOKENS = 256
+MAX_HISTORY_TURNS = 12
+MAX_PROMPT_TOKENS = 2048
+
+VYOM_SYSTEM_PROMPT = (
+    "You are Vyom, an advanced, highly capable open-source AI platform built for machine cognition, "
+    "clean software engineering, and rigorous analytical reasoning. "
+    "Always provide thorough, accurate, structured, and helpful responses. "
+    "When asked for code, write production-grade, well-commented implementations with explanations and complexity analysis. "
+    "Maintain high intellectual standards, explain concepts clearly from first principles, and avoid generic filler."
+)
 
 
 # ------------------------------------------------------------------ curated answers
@@ -235,7 +243,10 @@ class ChatEngine:
             text = " ".join([t["content"] for t in turns] + ([mem_text] if mem_text else []) + [message])
             return self.model.encode_text(text)[:, -MAX_PROMPT_TOKENS:]
         if self.uses_chat_template:
-            msgs = ([{"role": "system", "content": mem_text}] if mem_text else []) + \
+            sys_content = VYOM_SYSTEM_PROMPT
+            if mem_text:
+                sys_content += f"\n\n{mem_text}"
+            msgs = [{"role": "system", "content": sys_content}] + \
                    [{"role": t["role"], "content": t["content"]} for t in turns] + \
                    [{"role": "user", "content": message}]
             ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt")
