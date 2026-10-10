@@ -2099,6 +2099,7 @@
     }
 
     
+    
     async function submitUserMessage() {
         const input = document.getElementById('promptInput');
         const text = input.value.trim();
@@ -2113,10 +2114,11 @@
         input.value = '';
         clearSelectedImage();
         
-        const loadingId = appendShimmerLoading();
+        const ui = appendAssistantMessage();
+        ui.bodyEl.innerHTML = '<span style="color:var(--text-dim);">Thinking...</span>';
         
         try {
-            const res = await fetch('/api/generate', {
+            const res = await fetch('/api/chat/stream', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -2125,18 +2127,56 @@
                     mode: activeModelMode || "fast"
                 })
             });
-            const data = await res.json();
-            removeLoading(loadingId);
-            appendAssistantMessage(data.response, data.stats, data.telemetry, data.mode);
+            
+            ui.bodyEl.innerHTML = '';
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let fullText = "";
+            let buffer = "";
+            let modeLabel = "Fast";
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                let lines = buffer.split('\n\n');
+                buffer = lines.pop(); // keep incomplete chunk
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.type === 'token') {
+                                fullText += data.text;
+                                ui.bodyEl.innerHTML = renderVyomMarkdown(fullText);
+                                document.getElementById('messagesList').scrollTop = document.getElementById('messagesList').scrollHeight;
+                            } else if (data.type === 'meta') {
+                                modeLabel = data.mode;
+                            } else if (data.type === 'done') {
+                                const stats = data.stats;
+                                const telemetry = data.telemetry;
+                                if (stats) {
+                                    const steps = telemetry && telemetry.steps_executed ? telemetry.steps_executed : 0;
+                                    const ms = stats.total_ms ? stats.total_ms.toFixed(1) : 0;
+                                    const source = stats.condition || modeLabel;
+                                    ui.footerEl.innerHTML = `<div style="font-size: 0.7rem; color: var(--text-dim); text-align: right; margin-top: 4px;">${source} • ${steps} steps • ${ms} ms</div>`;
+                                }
+                                ui.actionsEl.style.display = 'flex';
+                                ui.listenBtn.onclick = () => speakText(fullText.replace(/[`\\']/g, ''), ui.listenBtn);
+                            } else if (data.type === 'error') {
+                                ui.bodyEl.innerHTML += `<div style="color:#ef4444; margin-top:8px;">Error: ${data.error}</div>`;
+                            }
+                        } catch (e) {
+                            console.error("SSE parse error", e, line);
+                        }
+                    }
+                }
+            }
         } catch (err) {
-            removeLoading(loadingId);
-            const errDiv = document.createElement('div');
-            errDiv.style.color = '#ef4444';
-            errDiv.innerText = 'Error: ' + err.message;
-            document.getElementById('messagesList').appendChild(errDiv);
+            ui.bodyEl.innerHTML = `<div style="color:#ef4444;">Connection failed: ${err.message}</div>`;
         }
     }
-
 function appendMessage(role, text, imageB64 = null) {
       const list = document.getElementById('messagesList');
       const div = document.createElement('div');
