@@ -20,6 +20,10 @@ def test_finite_gradients_and_graph_to_lm_flow():
 
     model = NeuroGraphModel(cfg)
     model.train()
+    # The gated adapter starts as an exact identity (gate=0). Open it so gradients reach
+    # adapter internals and the workspace (the init behaviour is tested separately).
+    with torch.no_grad():
+        model.adapter.gate.fill_(0.5)
 
     B, S = 2, 8
     input_ids = torch.randint(1, 100, (B, S))
@@ -52,3 +56,27 @@ def test_finite_gradients_and_graph_to_lm_flow():
     # 4. Check recurrent update gate gradients
     assert model.workspace.recurrent_update.w_z.weight.grad is not None
     assert torch.isfinite(model.workspace.recurrent_update.w_z.weight.grad).all()
+
+
+def test_gated_adapter_is_identity_at_init_and_gate_learns():
+    """At init the workspace must not change LM outputs, but the gate must receive gradient."""
+    torch.manual_seed(0)
+    cfg = NeuroGraphConfig()
+    cfg.lm.d_model = 32
+    cfg.lm.vocab_size = 100
+    cfg.workspace.num_nodes = 4
+    cfg.workspace.node_dim = 32
+    model = NeuroGraphModel(cfg)
+    model.eval()
+    ids = torch.randint(1, 100, (2, 8))
+    with torch.no_grad():
+        logits_a = model(ids, condition="A")["logits"]
+        logits_c = model(ids, condition="C")["logits"]
+    assert torch.allclose(logits_a, logits_c, atol=1e-6)
+    assert model.adapter_gate() == 0.0
+
+    model.train()
+    out = model(ids, labels=ids, condition="C")
+    out["lm_loss"].backward()
+    assert model.adapter.gate.grad is not None
+    assert torch.norm(model.adapter.gate.grad) > 0.0

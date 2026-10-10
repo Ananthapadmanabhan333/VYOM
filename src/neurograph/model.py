@@ -6,7 +6,8 @@ Integrates:
 3. Persistent Episodic Memory.
 4. World-State Predictor.
 5. Goal-Directed Planning Interface.
-6. Graph-to-Language Adapter (Prefix Injection preserving causal attention).
+6. Graph-to-Language Adapter: zero-initialised gated cross-attention (default) or the
+   legacy virtual-prefix adapter (`workspace.adapter_mode = "prefix"`).
 """
 
 from typing import Optional, Dict, Any
@@ -206,6 +207,62 @@ class GraphLanguageAdapter(nn.Module):
         return prefix_embeds
 
 
+class GatedCrossAttentionAdapter(nn.Module):
+    """Injects workspace state into token embeddings via gated cross-attention.
+
+    For every token embedding e_i (prompt *and* generated tokens):
+
+        e_i' = e_i + tanh(g) * W_o · Attn(q = W_q LN(e_i), K/V = W_k,v P(M))
+
+    where M are the final workspace nodes, P projects nodes to the LM width and g is a
+    scalar gate initialised to 0. Properties:
+
+    * Exact identity at initialisation: an untrained workspace cannot corrupt a
+      pretrained LM (the legacy prefix adapter raised DialoGPT perplexity ~23x).
+    * No sequence-length change and no positional shift, so it composes with KV caching:
+      each newly generated token is injected independently against the fixed nodes.
+    * Token-specific: each position retrieves different workspace content.
+    """
+
+    def __init__(self, node_dim: int, lm_dim: int, num_heads: int = 4, gate_init: float = 0.0):
+        super().__init__()
+        if lm_dim % num_heads != 0:
+            num_heads = 1
+        self.num_heads = num_heads
+        self.head_dim = lm_dim // num_heads
+        self.node_proj = nn.Sequential(nn.Linear(node_dim, lm_dim), nn.LayerNorm(lm_dim))
+        self.query_norm = nn.LayerNorm(lm_dim)
+        self.q_proj = nn.Linear(lm_dim, lm_dim, bias=False)
+        self.k_proj = nn.Linear(lm_dim, lm_dim, bias=False)
+        self.v_proj = nn.Linear(lm_dim, lm_dim, bias=False)
+        self.out_proj = nn.Linear(lm_dim, lm_dim)
+        self.gate = nn.Parameter(torch.full((1,), float(gate_init)))
+
+    def gate_value(self) -> float:
+        """Current effective gate tanh(g); 0.0 means the workspace has no effect."""
+        return float(torch.tanh(self.gate.detach()).item())
+
+    def forward(self, token_embeds: torch.Tensor, workspace_nodes: torch.Tensor) -> torch.Tensor:
+        """Args:
+
+            token_embeds (torch.Tensor): [B, S, D_lm]
+            workspace_nodes (torch.Tensor): [B, N, D_node]
+
+        Returns:
+            torch.Tensor: injected embeddings [B, S, D_lm]
+        """
+        B, S, D = token_embeds.shape
+        N = workspace_nodes.shape[1]
+        nodes = self.node_proj(workspace_nodes.to(token_embeds.dtype))  # [B, N, D]
+        q = self.q_proj(self.query_norm(token_embeds)).view(B, S, self.num_heads, self.head_dim)
+        k = self.k_proj(nodes).view(B, N, self.num_heads, self.head_dim)
+        v = self.v_proj(nodes).view(B, N, self.num_heads, self.head_dim)
+        q, k, v = q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
+        attn = F.softmax(torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim), dim=-1)
+        ctx = torch.matmul(attn, v).transpose(1, 2).reshape(B, S, D)
+        return token_embeds + torch.tanh(self.gate) * self.out_proj(ctx)
+
+
 class NeuroGraphModel(nn.Module):
     """End-to-end NeuroGraph-LLM Architecture."""
 
@@ -214,14 +271,19 @@ class NeuroGraphModel(nn.Module):
         self.config = config
 
         # 1. Base Language Model
+        self.lm_backend = "mock"
+        self.lm_load_error: Optional[str] = None
         if config.lm.model_name_or_path == "mock":
             self.base_lm = MockCausalLM(config.lm)
         else:
             try:
                 from transformers import AutoModelForCausalLM
                 self.base_lm = AutoModelForCausalLM.from_pretrained(config.lm.model_name_or_path)
-            except Exception:
-                # Fallback to Mock LM if weights unavailable or offline
+                self.lm_backend = "huggingface"
+            except Exception as exc:
+                # Fallback keeps tests/offline use working, but is recorded and surfaced
+                # via `lm_backend` / `lm_load_error` instead of failing silently.
+                self.lm_load_error = f"{type(exc).__name__}: {exc}"
                 self.base_lm = MockCausalLM(config.lm)
 
         # Handle freezing and LoRA
@@ -285,19 +347,129 @@ class NeuroGraphModel(nn.Module):
         self.world_model = WorldStatePredictor(config.world_model)
 
         # 6. Graph-to-Language Adapter
-        self.adapter = GraphLanguageAdapter(
-            node_dim=config.workspace.node_dim,
-            lm_dim=lm_dim,
-            num_prefix_tokens=min(4, config.workspace.num_nodes),
-        )
+        if config.workspace.adapter_mode == "prefix":
+            self.adapter: nn.Module = GraphLanguageAdapter(
+                node_dim=config.workspace.node_dim,
+                lm_dim=lm_dim,
+                num_prefix_tokens=min(4, config.workspace.num_nodes),
+            )
+        else:
+            self.adapter = GatedCrossAttentionAdapter(
+                node_dim=config.workspace.node_dim,
+                lm_dim=lm_dim,
+                gate_init=config.workspace.adapter_gate_init,
+            )
 
         # 6. Action selection head from pooled workspace state
         self.action_head = nn.Linear(config.workspace.node_dim, config.world_model.action_dim)
 
+    # ------------------------------------------------------------------ helpers
+    @property
+    def eos_token_id(self) -> Optional[int]:
+        if self.tokenizer is not None and self.tokenizer.eos_token_id is not None:
+            return int(self.tokenizer.eos_token_id)
+        return None
+
+    @property
+    def supports_static_connectivity(self) -> bool:
+        """Condition D needs a workspace built with dynamic_connectivity=False."""
+        return not self.workspace.connectivity.dynamic
+
+    def adapter_gate(self) -> Optional[float]:
+        """Effective injection gate (gated_cross mode) or None for the legacy prefix adapter."""
+        return self.adapter.gate_value() if isinstance(self.adapter, GatedCrossAttentionAdapter) else None
+
     def encode_context(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Extract contextual token embeddings from the base LM."""
+        """Return raw input token embeddings from the base LM (no positional information)."""
         embed_fn = self.base_lm.get_input_embeddings()
         return embed_fn(input_ids)
+
+    def lm_call(
+        self,
+        inputs_embeds: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        labels: Optional[torch.Tensor] = None,
+        past_key_values: Any = None,
+        use_cache: bool = False,
+        output_hidden_states: bool = False,
+    ) -> Dict[str, Any]:
+        """Run the base LM uniformly for HF and mock backends.
+
+        Returns a dict with keys: logits, loss, hidden (final layer or None), past.
+        KV caching is only available for Hugging Face backends.
+        """
+        if isinstance(self.base_lm, MockCausalLM):
+            out = self.base_lm(inputs_embeds=inputs_embeds, attention_mask=attention_mask, labels=labels)
+            return {"logits": out["logits"], "loss": out["loss"], "hidden": out["hidden_states"], "past": None}
+        out = self.base_lm(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            labels=labels,
+            past_key_values=past_key_values,
+            use_cache=use_cache,
+            output_hidden_states=output_hidden_states,
+        )
+        hidden = out.hidden_states[-1] if output_hidden_states and out.hidden_states is not None else None
+        return {
+            "logits": out.logits,
+            "loss": getattr(out, "loss", None),
+            "hidden": hidden,
+            "past": getattr(out, "past_key_values", None) if use_cache else None,
+        }
+
+    def workspace_context(
+        self, input_ids: torch.Tensor, attention_mask: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """Features the workspace reads, per `workspace.context_source`.
+
+        'hidden' runs the base LM once over the prompt and returns final hidden states,
+        which are contextual and order-aware. 'embeddings' returns raw embeddings.
+        """
+        embeds = self.encode_context(input_ids)
+        if self.config.workspace.context_source == "embeddings":
+            return embeds
+        lm_frozen = not any(p.requires_grad for p in self.base_lm.parameters())
+        with torch.set_grad_enabled(torch.is_grad_enabled() and not lm_frozen):
+            out = self.lm_call(embeds, attention_mask=attention_mask, output_hidden_states=True)
+        return out["hidden"]
+
+    def run_workspace(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        condition: Optional[str] = None,
+        steps: Optional[int] = None,
+        active_goal: Optional[torch.Tensor] = None,
+        uncertainty: Optional[torch.Tensor] = None,
+        halt_threshold: Optional[float] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Run the cognitive workspace for a condition; returns None for condition A."""
+        cond = condition or self.config.condition
+        if cond == "A":
+            return None
+        if cond == "D" and not self.supports_static_connectivity:
+            raise ValueError(
+                "Condition D requires a model built with workspace.dynamic_connectivity=False"
+            )
+        if cond == "C" and self.supports_static_connectivity:
+            raise ValueError(
+                "Condition C requires a model built with workspace.dynamic_connectivity=True"
+            )
+        n_steps = 1 if cond == "B" else (steps or self.config.workspace.recurrent_steps)
+        context = self.workspace_context(input_ids, attention_mask)
+        return self.workspace(
+            context_features=context,
+            context_mask=attention_mask,
+            active_goal=active_goal,
+            uncertainty=uncertainty,
+            steps=n_steps,
+            halt_threshold=halt_threshold if cond != "B" else None,
+        )
+
+    def inject(self, token_embeds: torch.Tensor, workspace_outputs: Dict[str, Any]) -> torch.Tensor:
+        """Apply the gated cross-attention adapter (gated_cross mode only)."""
+        assert isinstance(self.adapter, GatedCrossAttentionAdapter)
+        return self.adapter(token_embeds, workspace_outputs["final_nodes"])
 
     def encode_text(self, text: str, max_length: Optional[int] = None) -> torch.Tensor:
         """Encode text prompt into input token IDs using tokenizer or deterministic fallback."""
@@ -348,72 +520,46 @@ class NeuroGraphModel(nn.Module):
         B, S = input_ids.shape
         device = input_ids.device
 
-        # Contextual encoding
         token_embeds = self.encode_context(input_ids)  # [B, S, D_lm]
 
-        workspace_outputs = None
-        prefix_embeds = None
         action_logits = None
         reg_loss = torch.tensor(0.0, device=device)
+        full_embeds, full_mask, full_labels = token_embeds, attention_mask, labels
 
-        if cond == "A":
-            # Condition A: Pure Base LLM without graph workspace
-            full_embeds = token_embeds
-            full_mask = attention_mask
-            if labels is not None:
-                full_labels = labels
-            else:
-                full_labels = None
-        else:
-            # Determine steps based on condition
-            steps = 1 if cond == "B" else self.config.workspace.recurrent_steps
-
-            # Run Cognitive Workspace
-            workspace_outputs = self.workspace(
-                context_features=token_embeds,
-                context_mask=attention_mask,
-                active_goal=active_goal,
-                uncertainty=uncertainty,
-                steps=steps,
-            )
-
-            final_nodes = workspace_outputs["final_nodes"]
-            pooled_state = workspace_outputs["pooled_state"]
-            reg_loss = workspace_outputs["reg_loss"]
-
-            # Compute action logits from cognitive state
-            action_logits = self.action_head(pooled_state)
-
-            # Generate virtual prefix tokens via adapter
-            prefix_embeds = self.adapter(final_nodes)  # [B, K, D_lm]
-            K = prefix_embeds.shape[1]
-
-            # Prepend prefix embeddings to token embeddings
-            full_embeds = torch.cat([prefix_embeds, token_embeds], dim=1)  # [B, K + S, D_lm]
-
-            # Adjust attention mask and labels
-            prefix_mask = torch.ones(B, K, dtype=torch.long, device=device)
-            if attention_mask is not None:
-                full_mask = torch.cat([prefix_mask, attention_mask], dim=1)
-            else:
-                full_mask = torch.ones(B, K + S, dtype=torch.long, device=device)
-
-            if labels is not None:
-                # Mask out prefix tokens from loss calculation using ignore_index = -100
-                prefix_labels = torch.full((B, K), -100, dtype=torch.long, device=device)
-                full_labels = torch.cat([prefix_labels, labels], dim=1)
-            else:
-                full_labels = None
-
-        # Execute Base Language Model forward
-        lm_outputs = self.base_lm(
-            inputs_embeds=full_embeds,
-            attention_mask=full_mask,
-            labels=full_labels,
+        workspace_outputs = self.run_workspace(
+            input_ids,
+            attention_mask=attention_mask,
+            condition=cond,
+            active_goal=active_goal,
+            uncertainty=uncertainty,
+            halt_threshold=self.config.workspace.halt_threshold,
         )
 
-        lm_loss = getattr(lm_outputs, "loss", None) if hasattr(lm_outputs, "loss") else (lm_outputs.get("loss") if isinstance(lm_outputs, dict) else None)
-        logits = getattr(lm_outputs, "logits", None) if hasattr(lm_outputs, "logits") else (lm_outputs.get("logits") if isinstance(lm_outputs, dict) else None)
+        if workspace_outputs is not None:
+            reg_loss = workspace_outputs["reg_loss"]
+            action_logits = self.action_head(workspace_outputs["pooled_state"])
+
+            if isinstance(self.adapter, GatedCrossAttentionAdapter):
+                # Workspace -> every token via gated cross-attention (no length change).
+                full_embeds = self.inject(token_embeds, workspace_outputs)
+            else:
+                # Legacy prefix mode: prepend K virtual tokens; mask them out of the loss.
+                prefix_embeds = self.adapter(workspace_outputs["final_nodes"])  # [B, K, D_lm]
+                K = prefix_embeds.shape[1]
+                full_embeds = torch.cat([prefix_embeds, token_embeds], dim=1)
+                prefix_mask = torch.ones(B, K, dtype=torch.long, device=device)
+                full_mask = (
+                    torch.cat([prefix_mask, attention_mask], dim=1)
+                    if attention_mask is not None
+                    else torch.ones(B, K + S, dtype=torch.long, device=device)
+                )
+                if labels is not None:
+                    prefix_labels = torch.full((B, K), -100, dtype=torch.long, device=device)
+                    full_labels = torch.cat([prefix_labels, labels], dim=1)
+
+        lm_out = self.lm_call(full_embeds, attention_mask=full_mask, labels=full_labels)
+        lm_loss = lm_out["loss"]
+        logits = lm_out["logits"]
 
         # World model loss if state/action pairs provided
         world_loss = torch.tensor(0.0, device=device)

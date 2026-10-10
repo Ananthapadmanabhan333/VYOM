@@ -98,6 +98,7 @@ class DynamicCognitiveWorkspace(nn.Module):
         uncertainty: Optional[torch.Tensor] = None,
         initial_nodes: Optional[torch.Tensor] = None,
         steps: Optional[int] = None,
+        halt_threshold: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Execute recurrent cognitive workspace updates.
 
@@ -146,6 +147,12 @@ class DynamicCognitiveWorkspace(nn.Module):
         node_history: List[torch.Tensor] = [m_t]
         adj_history: List[torch.Tensor] = []
         logits_history: List[torch.Tensor] = []
+        step_deltas: List[torch.Tensor] = []  # per-step relative state change, [B] each
+
+        halt_threshold = halt_threshold if halt_threshold is not None else self.config.halt_threshold
+        min_steps = max(1, self.config.min_steps)
+        halted = torch.zeros(B, dtype=torch.bool, device=device)
+        steps_executed = torch.zeros(B, dtype=torch.long, device=device)
 
         # Recurrent graph updates: M(t+1) = GraphUpdate(M(t), H, G(t))
         for step in range(num_steps):
@@ -164,8 +171,25 @@ class DynamicCognitiveWorkspace(nn.Module):
             incoming = torch.cat([msg_t, ctx_t, g, u], dim=-1)  # [B, N, D_node * 4]
 
             # 5. Gated recurrent transition: M(t+1) = GRU(M(t), incoming)
-            m_t = self.recurrent_update(m_t, incoming)
+            m_new = self.recurrent_update(m_t, incoming)
+
+            # Relative change per sample (detached: telemetry / halting signal only)
+            delta = (
+                torch.linalg.vector_norm((m_new - m_t).detach().flatten(1), dim=-1)
+                / torch.linalg.vector_norm(m_t.detach().flatten(1), dim=-1).clamp_min(1e-6)
+            )
+            step_deltas.append(delta)
+
+            # Halted samples keep their previous state (no further computation applied)
+            active = ~halted
+            m_t = torch.where(active[:, None, None], m_new, m_t)
+            steps_executed = steps_executed + active.long()
             node_history.append(m_t)
+
+            if halt_threshold is not None and step + 1 >= min_steps:
+                halted = halted | (delta < halt_threshold)
+                if bool(halted.all()):
+                    break
 
         m_final = self.norm(m_t)
 
@@ -188,4 +212,6 @@ class DynamicCognitiveWorkspace(nn.Module):
             "node_history": node_history,
             "adj_history": adj_history,
             "reg_loss": reg_loss,
+            "step_deltas": step_deltas,
+            "steps_executed": steps_executed,
         }

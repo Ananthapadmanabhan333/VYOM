@@ -36,6 +36,20 @@ class WorkspaceConfig:
     uncertainty_dim: int = 16
     num_heads: int = 2
     gate_type: str = "gru"  # 'gru' or 'residual'
+    # How workspace state reaches the LM:
+    #   'gated_cross' - each token embedding cross-attends to workspace nodes; the result is
+    #                   added through a zero-initialised tanh gate (exact identity until trained).
+    #   'prefix'      - legacy: K projected nodes are prepended as virtual prefix tokens.
+    adapter_mode: str = "gated_cross"
+    adapter_gate_init: float = 0.0
+    # What the workspace reads:
+    #   'hidden'     - final hidden states of the base LM over the prompt (contextual, ordered).
+    #   'embeddings' - raw input embeddings (legacy; carries no positional information).
+    context_source: str = "hidden"
+    # Adaptive computation: stop updating a sample once its relative state change
+    # ||M(t+1)-M(t)|| / ||M(t)|| falls below this value. None disables halting.
+    halt_threshold: Optional[float] = None
+    min_steps: int = 1
 
 
 @dataclass
@@ -102,6 +116,30 @@ class NeuroGraphConfig:
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+    def validate(self) -> "NeuroGraphConfig":
+        """Raise ValueError on inconsistent settings; returns self for chaining."""
+        errors = []
+        if self.condition not in {"A", "B", "C", "D"}:
+            errors.append(f"condition must be one of A/B/C/D, got {self.condition!r}")
+        ws = self.workspace
+        if ws.adapter_mode not in {"gated_cross", "prefix"}:
+            errors.append(f"workspace.adapter_mode invalid: {ws.adapter_mode!r}")
+        if ws.context_source not in {"hidden", "embeddings"}:
+            errors.append(f"workspace.context_source invalid: {ws.context_source!r}")
+        if ws.num_nodes < 1 or ws.node_dim < 1 or ws.recurrent_steps < 1:
+            errors.append("workspace num_nodes/node_dim/recurrent_steps must be >= 1")
+        if ws.node_dim % ws.num_heads != 0:
+            errors.append("workspace.node_dim must be divisible by workspace.num_heads")
+        if ws.top_k_edges is not None and not (1 <= ws.top_k_edges <= ws.num_nodes):
+            errors.append("workspace.top_k_edges must be in [1, num_nodes]")
+        if ws.halt_threshold is not None and ws.halt_threshold <= 0:
+            errors.append("workspace.halt_threshold must be > 0 when set")
+        if self.memory.similarity_metric not in {"cosine", "dot"}:
+            errors.append("memory.similarity_metric must be 'cosine' or 'dot'")
+        if errors:
+            raise ValueError("Invalid NeuroGraphConfig: " + "; ".join(errors))
+        return self
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "NeuroGraphConfig":
         lm_cfg = LMConfig(**data.get("lm", {}))
@@ -120,7 +158,7 @@ class NeuroGraphConfig:
             world_model=wm_cfg,
             planner=pl_cfg,
             training=tr_cfg,
-        )
+        ).validate()
 
     def save_yaml(self, path: Path | str) -> None:
         path = Path(path)
