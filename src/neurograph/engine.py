@@ -10,7 +10,7 @@ VYOM_MODEL            HF model id/path or ``mock`` (default ``Qwen/Qwen2.5-0.5B-
 VYOM_CHECKPOINT       optional NeuroGraph checkpoint to load (only if fully compatible)
 VYOM_ALLOW_DOWNLOAD   ``1`` to allow Hugging Face downloads (default: offline only)
 VYOM_THREADS          torch CPU threads (default: min(8, cpu_count))
-VYOM_MAX_TIME_S       wall-clock generation budget per reply (default 2.0)
+VYOM_MAX_TIME_S       wall-clock generation budget per reply (default 15.0)
 VYOM_WORLD_MODEL      trained world model path (default ``models/world_model_gridworld.pt``)
 """
 
@@ -179,7 +179,7 @@ class ChatEngine:
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         threads = int(os.environ.get("VYOM_THREADS", min(8, os.cpu_count() or 1)))
         torch.set_num_threads(threads)
-        self.max_time_s = float(os.environ.get("VYOM_MAX_TIME_S", "2.0"))
+        self.max_time_s = float(os.environ.get("VYOM_MAX_TIME_S", "15.0"))
 
         cfg = NeuroGraphConfig()
         cfg.lm.model_name_or_path = self.model_name

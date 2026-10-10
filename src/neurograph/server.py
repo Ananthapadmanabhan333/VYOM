@@ -136,7 +136,7 @@ class ChatRequest(BaseModel):
     mode: Literal["fast", "cognitive", "adaptive"] = "fast"
     temperature: float = Field(0.7, ge=0.0, le=2.0)
     top_p: float = Field(0.9, gt=0.0, le=1.0)
-    max_new_tokens: int = Field(64, ge=1, le=256)
+    max_new_tokens: int = Field(512, ge=1, le=1024)
     repetition_penalty: float = Field(1.15, ge=1.0, le=2.0)
     do_sample: bool = True
     use_memory: bool = True
