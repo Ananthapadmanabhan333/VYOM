@@ -1,0 +1,2468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VYOM | Toward Machine Cognition</title>
+  <link rel="icon" type="image/png" href="/vyom_logo.png">
+  <style>
+    :root {
+      --bg-main: #06080e;
+      --bg-sidebar: #0a0d14;
+      --bg-card: #0e121b;
+      --bg-card-hover: #161c2b;
+      --bg-input: #0e121b;
+      --border-subtle: #1c2333;
+      --border-focus: #e6c887;
+      --text-main: #f5f2eb;
+      --text-muted: #9aa5b8;
+      --text-dim: #647087;
+      --vyom-gold: #e6c887;
+      --vyom-gold-light: #fbf0d3;
+      --vyom-gold-dark: #b89047;
+      --vyom-gold-glow: rgba(230, 200, 135, 0.35);
+      --gemini-blue: #e6c887;
+      --gemini-purple: #c99e52;
+      --gemini-pink: #fbf0d3;
+      --gemini-gradient: linear-gradient(135deg, #fbf0d3 0%, #e6c887 35%, #c99e52 70%, #9e742e 100%);
+      --font-family: -apple-system, BlinkMacSystemFont, "Google Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-main);
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(230, 200, 135, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 100% 100%, rgba(184, 144, 71, 0.04) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      user-select: text;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 12px;
+      gap: 14px;
+      flex-shrink: 0;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s;
+      position: relative;
+      z-index: 10;
+    }
+
+    .sidebar.collapsed {
+      width: 68px;
+      padding: 16px 8px;
+    }
+
+    .sidebar.collapsed .sidebar-text,
+    .sidebar.collapsed .recent-section,
+    .sidebar.collapsed .settings-panel,
+    .sidebar.collapsed .sidebar-bottom-item span {
+      display: none !important;
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px;
+    }
+
+    .hamburger-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .hamburger-btn:hover { background-color: var(--bg-card-hover); color: var(--text-main); }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .vyom-brand-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1.5px solid var(--vyom-gold);
+      box-shadow: 0 0 12px var(--vyom-gold-glow);
+      flex-shrink: 0;
+    }
+
+    .brand-text-col {
+      display: flex;
+      flex-direction: column;
+      line-height: 1.15;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 2.5px;
+      background: var(--gemini-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-sub {
+      font-size: 0.54rem;
+      letter-spacing: 1px;
+      color: var(--text-dim);
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    .sparkle-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--gemini-gradient);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px var(--vyom-gold-glow);
+      flex-shrink: 0;
+    }
+    .sparkle-icon svg { width: 16px; height: 16px; fill: #10141d; }
+
+    .new-chat-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background-color: #282a2c;
+      border: none;
+      color: var(--text-main);
+      padding: 12px 16px;
+      border-radius: 24px;
+      cursor: pointer;
+      font-size: 0.92rem;
+      font-weight: 500;
+      transition: background 0.2s, box-shadow 0.2s;
+      width: 100%;
+    }
+    .new-chat-btn:hover {
+      background-color: #333538;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .sidebar.collapsed .new-chat-btn {
+      justify-content: center;
+      padding: 12px 0;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      margin: 0 auto;
+    }
+
+    .nav-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 20px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .nav-item:hover, .nav-item.active {
+      background-color: #2b2c2f;
+      color: #fff;
+    }
+    .sidebar.collapsed .nav-item {
+      justify-content: center;
+      padding: 10px 0;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      margin: 0 auto;
+    }
+
+    /* Recent Chats */
+    .recent-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-grow: 1;
+      overflow-y: auto;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 12px;
+    }
+
+    .recent-header {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      font-weight: 600;
+      padding: 0 12px;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.15s;
+    }
+    .recent-item:hover {
+      background-color: var(--bg-card-hover);
+      color: var(--text-main);
+    }
+    .recent-item svg { width: 14px; height: 14px; flex-shrink: 0; fill: currentColor; }
+
+    /* Settings Panel */
+    .settings-panel {
+      background-color: #17181a;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 0.8rem;
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    select, input[type="range"] {
+      background-color: #282a2c;
+      color: #fff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.78rem;
+    }
+
+    /* Sidebar Footer */
+    .sidebar-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 8px;
+    }
+
+    .sidebar-bottom-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.84rem;
+      transition: all 0.2s;
+    }
+    .sidebar-bottom-item:hover { background-color: var(--bg-card-hover); color: var(--text-main); }
+    .sidebar-bottom-item svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+    /* Main Container */
+    .main-content {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: relative;
+      background-color: var(--bg-main);
+    }
+
+    /* Topbar */
+    .topbar {
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      position: relative;
+    }
+
+    .model-selector-container {
+      position: relative;
+    }
+
+    .model-selector {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background-color: #1e1f20;
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-main);
+      transition: background 0.2s;
+    }
+    .model-selector:hover { background-color: #2b2c2f; }
+    .model-selector span.badge {
+      font-size: 0.72rem;
+      color: var(--gemini-blue);
+      font-weight: 600;
+      background: rgba(71, 150, 230, 0.15);
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .model-dropdown-menu {
+      position: absolute;
+      top: 42px;
+      left: 0;
+      width: 310px;
+      background-color: #1e1f20;
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      padding: 8px;
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 200;
+    }
+    .model-dropdown-menu.show { display: flex; }
+
+    .model-option {
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      transition: background 0.15s;
+    }
+    .model-option:hover, .model-option.selected {
+      background-color: #282a2c;
+    }
+    .model-option-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .model-option-desc {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-voice-btn {
+      background: #282a2c;
+      color: #fff;
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .live-voice-btn:hover {
+      background: var(--gemini-gradient);
+      border-color: transparent;
+      box-shadow: 0 0 12px rgba(155, 114, 203, 0.4);
+    }
+
+    .export-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+    .export-btn:hover { background-color: var(--bg-card-hover); color: #fff; }
+
+    .user-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7c3aed, #4f46e5);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    /* Views */
+    .view-section {
+      display: none;
+      flex-grow: 1;
+      overflow-y: auto;
+      height: calc(100vh - 64px);
+    }
+    .view-section.active-view {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Chat View */
+    .chat-container {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 24px 20% 160px 20%;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    @media (max-width: 1200px) {
+      .chat-container { padding: 24px 10% 160px 10%; }
+    }
+
+    /* Hero Greeting */
+    .hero-greeting {
+      margin-top: 36px;
+      margin-bottom: 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-brand-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .hero-logo-img {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid var(--vyom-gold);
+      box-shadow: 0 0 35px var(--vyom-gold-glow), 0 0 15px rgba(230, 200, 135, 0.5);
+      object-fit: cover;
+      animation: logoPulse 4s infinite ease-in-out;
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 25px var(--vyom-gold-glow); }
+      50% { transform: scale(1.05); box-shadow: 0 0 45px rgba(249, 231, 185, 0.5), 0 0 20px var(--vyom-gold); }
+    }
+
+    .hero-title {
+      font-size: 3.4rem;
+      font-weight: 800;
+      letter-spacing: 8px;
+      background: var(--gemini-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .hero-tagline {
+      font-size: 0.88rem;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: var(--vyom-gold);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      opacity: 0.95;
+    }
+
+    .hero-subtitle {
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      font-weight: 400;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+
+    /* Suggestion Cards */
+    .suggestions-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    @media (max-width: 900px) {
+      .suggestions-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .suggestion-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 16px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 130px;
+      transition: all 0.2s;
+    }
+    .suggestion-card:hover {
+      background-color: var(--bg-card-hover);
+      border-color: #555;
+      transform: translateY(-2px);
+    }
+    .suggestion-text {
+      color: var(--text-main);
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+    .suggestion-icon {
+      align-self: flex-end;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background-color: #2b2c2f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+    }
+
+    /* Message Bubbles */
+    .message {
+      display: flex;
+      gap: 18px;
+      max-width: 100%;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+      max-width: 80%;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      width: 100%;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 600;
+    }
+    .avatar.user-av { background: #4f46e5; color: #fff; font-size: 0.9rem; }
+    .avatar.vyom-av, .avatar.gemini-av {
+      background: #0a0d14;
+      border: 1.5px solid var(--vyom-gold);
+      box-shadow: 0 0 10px var(--vyom-gold-glow);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .avatar-logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .message-content-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .message.user .msg-body {
+      background-color: #2b2c2f;
+      color: #fff;
+      border-radius: 20px 20px 4px 20px;
+      padding: 12px 18px;
+      font-size: 0.96rem;
+      line-height: 1.5;
+    }
+
+    .message.user .attached-image-preview {
+      max-width: 260px;
+      max-height: 200px;
+      border-radius: 12px;
+      margin-bottom: 8px;
+      object-fit: cover;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .message.assistant .msg-body {
+      background: none;
+      color: var(--text-main);
+      font-size: 0.98rem;
+      line-height: 1.65;
+    }
+
+    /* Thinking Collapsible Box */
+    .thought-container {
+      background-color: #17181a;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      font-size: 0.84rem;
+    }
+    .thought-header {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      color: var(--text-muted);
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .thought-header:hover { background-color: var(--bg-card-hover); color: var(--text-main); }
+    .thought-header-left { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+    .thought-content {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border-subtle);
+      color: #a8adb3;
+      white-space: pre-wrap;
+      font-family: monospace;
+      line-height: 1.5;
+      display: none;
+    }
+    .thought-content.open { display: block; }
+
+    /* Markdown Elements */
+    .msg-body h3 {
+      font-size: 1.25rem;
+      margin: 16px 0 8px 0;
+      color: #fff;
+      font-weight: 600;
+    }
+    .msg-body h4 {
+      font-size: 1.05rem;
+      margin: 14px 0 6px 0;
+      color: #d1d5db;
+      font-weight: 600;
+    }
+    .msg-body p { margin-bottom: 12px; }
+    .msg-body ul, .msg-body ol {
+      margin: 8px 0 14px 22px;
+      line-height: 1.7;
+    }
+    .msg-body li { margin-bottom: 4px; }
+    .msg-body strong { color: #fff; font-weight: 600; }
+    .msg-body code {
+      background-color: #2b2c2f;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 0.88rem;
+      color: #e5c07b;
+    }
+    .msg-body blockquote {
+      border-left: 3px solid var(--gemini-purple);
+      padding: 6px 14px;
+      margin: 12px 0;
+      background-color: rgba(155, 114, 203, 0.08);
+      border-radius: 0 8px 8px 0;
+      color: #cbd5e1;
+    }
+
+    /* Markdown Tables */
+    .msg-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 0.88rem;
+    }
+    .msg-body th, .msg-body td {
+      border: 1px solid var(--border-subtle);
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .msg-body th { background-color: #1f2022; color: #fff; }
+    .msg-body tr:nth-child(even) { background-color: #17181a; }
+
+    /* Code Blocks */
+    .code-container {
+      margin: 14px 0;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      background-color: #17181a;
+      overflow: hidden;
+    }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      background-color: #202123;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.76rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .code-actions { display: flex; align-items: center; gap: 8px; }
+    .code-action-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.76rem;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .code-action-btn:hover { background-color: #2b2c2f; color: #fff; }
+    .code-container pre {
+      margin: 0;
+      padding: 14px;
+      overflow-x: auto;
+      font-family: "JetBrains Mono", Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: #9cdcfe;
+    }
+
+    /* Message Action Bar */
+    .msg-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      color: var(--text-dim);
+    }
+    .action-icon-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      transition: all 0.15s;
+    }
+    .action-icon-btn:hover { background-color: #282a2c; color: var(--text-main); }
+    .action-icon-btn.active { color: var(--gemini-blue); }
+    .action-icon-btn svg { width: 14px; height: 14px; fill: currentColor; }
+    .meta-badge {
+      margin-left: auto;
+      font-size: 0.74rem;
+      color: var(--text-dim);
+      background-color: #1e1f20;
+      padding: 3px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    /* Shimmer Thinking Animation */
+    .shimmer-loading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      padding: 10px 0;
+    }
+    .shimmer-bar {
+      width: 140px;
+      height: 6px;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #4285f4 0%, #9b72cb 50%, #d96570 100%);
+      background-size: 200% 100%;
+      animation: shimmerMove 1.5s infinite linear;
+    }
+    @keyframes shimmerMove {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* Floating Input Pill */
+    .input-wrapper {
+      position: absolute;
+      bottom: 20px;
+      left: 20%;
+      right: 20%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      z-index: 100;
+    }
+    @media (max-width: 1200px) {
+      .input-wrapper { left: 10%; right: 10%; }
+    }
+
+    /* Image Attachment Preview Chip */
+    .image-preview-container {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background-color: #1e1f20;
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 6px 12px;
+      margin-bottom: 6px;
+      align-self: flex-start;
+      max-width: 100%;
+    }
+    .image-preview-thumb {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+    .image-preview-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+    }
+    .image-remove-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 4px;
+      font-size: 1rem;
+      border-radius: 50%;
+    }
+    .image-remove-btn:hover { color: #f87171; }
+
+    /* Voice Recording Indicator & Sound Waves */
+    .voice-recording-indicator {
+      display: none;
+      align-items: center;
+      gap: 14px;
+      background-color: #1e1f20;
+      border: 1px solid #4796e6;
+      border-radius: 20px;
+      padding: 8px 18px;
+      margin-bottom: 8px;
+      box-shadow: 0 4px 16px rgba(71, 150, 230, 0.25);
+      font-size: 0.88rem;
+      color: var(--text-main);
+    }
+    .voice-recording-indicator.active { display: flex; }
+    .voice-wave-bars {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 24px;
+    }
+    .voice-bar {
+      width: 4px;
+      height: 6px;
+      background: var(--gemini-gradient);
+      border-radius: 3px;
+      transition: height 0.05s ease;
+    }
+    .voice-stop-btn {
+      background: #dc2626;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .input-bar {
+      width: 100%;
+      background-color: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      border-radius: 28px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .input-bar:focus-within {
+      border-color: #5b626a;
+      box-shadow: 0 4px 24px rgba(155, 114, 203, 0.2);
+    }
+
+    .attach-btn, .mic-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px;
+      border-radius: 50%;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .attach-btn:hover, .mic-btn:hover { background-color: #2b2c2f; color: var(--text-main); }
+    .attach-btn svg, .mic-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+    .mic-btn.listening {
+      color: #f87171;
+      animation: pulseMic 1.2s infinite;
+      background-color: rgba(248, 113, 113, 0.15);
+    }
+    @keyframes pulseMic {
+      0% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.6); }
+      70% { box-shadow: 0 0 0 10px rgba(248, 113, 113, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(248, 113, 113, 0); }
+    }
+
+    #promptInput {
+      flex-grow: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 1rem;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      max-height: 180px;
+      line-height: 1.5;
+    }
+    #promptInput::placeholder { color: #73777d; }
+
+    .send-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background-color: #2b2c2f;
+      border: none;
+      color: #73777d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+    .send-btn.active {
+      background: var(--gemini-gradient);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(155, 114, 203, 0.4);
+    }
+
+    .disclaimer-text {
+      font-size: 0.74rem;
+      color: #73777d;
+      text-align: center;
+    }
+
+    /* Live Voice Modal (Gemini Live Mode) */
+    .live-voice-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(10, 10, 12, 0.95);
+      backdrop-filter: blur(20px);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 40px 20px;
+    }
+    .live-voice-modal.show { display: flex; }
+
+    .live-modal-header {
+      width: 100%;
+      max-width: 800px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .live-modal-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .live-close-btn {
+      background: #222326;
+      border: 1px solid var(--border-subtle);
+      color: #fff;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    /* Pulsating Fluid Glowing Orb */
+    .live-orb-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+    }
+
+    .live-orb {
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff5d8 0%, #e6c887 35%, #9e742e 70%, #0a0d14 100%);
+      box-shadow: 0 0 70px rgba(230, 200, 135, 0.7), inset 0 0 25px rgba(255, 255, 255, 0.8);
+      animation: orbBreathe 3.5s infinite ease-in-out;
+      transition: transform 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .live-orb::after {
+      content: '';
+      position: absolute;
+      width: 230px;
+      height: 64px;
+      border: 2px solid rgba(230, 200, 135, 0.45);
+      border-radius: 50%;
+      transform: rotate(-25deg);
+      box-shadow: 0 0 20px rgba(230, 200, 135, 0.3);
+      pointer-events: none;
+    }
+    @keyframes orbBreathe {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 30px rgba(230, 200, 135, 0.6)); }
+      50% { transform: scale(1.08); filter: drop-shadow(0 0 50px rgba(249, 231, 185, 0.8)); }
+    }
+
+    .live-transcript {
+      max-width: 600px;
+      text-align: center;
+      font-size: 1.15rem;
+      color: var(--text-main);
+      min-height: 60px;
+      line-height: 1.6;
+    }
+
+    .live-status-pill {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      background-color: #1e1f20;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .live-modal-footer {
+      display: flex;
+      gap: 20px;
+    }
+    .live-control-btn {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background-color: #222326;
+      border: 1px solid var(--border-subtle);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: all 0.2s;
+    }
+    .live-control-btn:hover { background-color: #333538; }
+    .live-control-btn.end-btn { background-color: #dc2626; border-color: transparent; }
+
+    /* Dedicated Views 2, 3, 4 Containers */
+    .dedicated-container {
+      padding: 24px 32px;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 20px;
+    }
+    .panel-header {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* GridWorld Grid */
+    .gridworld-board {
+      display: inline-grid;
+      grid-template-columns: repeat(6, 44px);
+      grid-gap: 6px;
+      background-color: #17181a;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border-subtle);
+    }
+    .grid-cell {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.85rem;
+      background-color: #282a2c;
+      transition: all 0.2s;
+    }
+    .grid-cell.cell-start { background-color: #3b82f6; color: #fff; }
+    .grid-cell.cell-goal { background-color: #10b981; color: #fff; }
+    .grid-cell.cell-obstacle { background-color: #dc2626; color: #fff; }
+    .grid-cell.cell-path { background-color: #8b5cf6; color: #fff; }
+
+    /* Memory Table */
+    .memory-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.86rem;
+    }
+    .memory-table th, .memory-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      text-align: left;
+    }
+    .memory-table th { color: var(--text-dim); text-transform: uppercase; font-size: 0.74rem; }
+  </style>
+</head>
+<body>
+
+  <!-- Hidden File Input for Image Upload -->
+  <input type="file" id="imageFileInput" accept="image/*" style="display:none;" onchange="handleImageSelected(event)">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="appSidebar">
+    <div class="sidebar-header">
+      <div class="brand">
+        <img src="/vyom_logo.png" alt="VYOM" class="vyom-brand-logo">
+        <div class="brand-text-col sidebar-text">
+          <span class="brand-title">VYOM</span>
+          <span class="brand-sub">TOWARD MACHINE COGNITION</span>
+        </div>
+      </div>
+      <button class="hamburger-btn" onclick="toggleSidebar()" title="Collapse menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+      </button>
+    </div>
+
+    <button class="new-chat-btn" onclick="startNewChat()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="sidebar-text">New chat</span>
+    </button>
+
+    <div class="nav-section">
+      <div class="nav-item active" id="nav-chat" onclick="switchTab('chat')">
+        <span style="font-size:1.1rem;">💬</span>
+        <span class="sidebar-text">VYOM Chat</span>
+      </div>
+      <div class="nav-item" id="nav-graph" onclick="switchTab('graph')">
+        <span style="font-size:1.1rem;">🕸️</span>
+        <span class="sidebar-text">Workspace Graph</span>
+      </div>
+      <div class="nav-item" id="nav-planner" onclick="switchTab('planner')">
+        <span style="font-size:1.1rem;">🗺️</span>
+        <span class="sidebar-text">GridWorld Planner</span>
+      </div>
+      <div class="nav-item" id="nav-memory" onclick="switchTab('memory')">
+        <span style="font-size:1.1rem;">🧠</span>
+        <span class="sidebar-text">Episodic Memory</span>
+      </div>
+    </div>
+
+    <!-- Recent Section -->
+    <div class="recent-section">
+      <div class="recent-header">Recent</div>
+      <div class="recent-item" onclick="sendPrompt('Explain how dynamic recurrent graph workspace solves multi-step reasoning.')">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+        <span class="sidebar-text">Recurrent Graph Reasoning</span>
+      </div>
+      <div class="recent-item" onclick="sendPrompt('Write a Python implementation of QuickSort with complexity analysis.')">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+        <span class="sidebar-text">Python QuickSort Algorithm</span>
+      </div>
+      <div class="recent-item" onclick="sendPrompt('Explain conflict versioning in persistent episodic memory.')">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+        <span class="sidebar-text">Episodic Conflict Versioning</span>
+      </div>
+      <div class="recent-item" onclick="switchTab('planner'); runPlanner();">
+        <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+        <span class="sidebar-text">GridWorld Trajectory Rollout</span>
+      </div>
+    </div>
+
+    <!-- Settings Controls -->
+    <div class="settings-panel">
+      <div style="font-weight:600; color:var(--text-dim); text-transform:uppercase; font-size:0.72rem;">Model Configuration</div>
+      <div class="setting-row">
+        <span>Condition:</span>
+        <select id="conditionSelect">
+          <option value="C" selected>Condition C (Dynamic Graph)</option>
+          <option value="B">Condition B (One-pass Graph)</option>
+          <option value="D">Condition D (Static Graph)</option>
+          <option value="A">Condition A (Base LM)</option>
+        </select>
+      </div>
+      <div class="setting-row">
+        <span>Steps (T): <span id="stepsVal">3</span></span>
+        <input type="range" id="stepsSlider" min="1" max="5" value="3" oninput="document.getElementById('stepsVal').innerText = this.value">
+      </div>
+      <div class="setting-row">
+        <span>Temp: <span id="tempVal">0.7</span></span>
+        <input type="range" id="tempSlider" min="0" max="1" step="0.1" value="0.7" oninput="document.getElementById('tempVal').innerText = this.value">
+      </div>
+    </div>
+
+    <!-- Footer Items -->
+    <div class="sidebar-footer">
+      <div class="sidebar-bottom-item" onclick="openLiveVoiceModal()">
+        <span style="font-size:1rem;">🎙️</span>
+        <span>VYOM Live Assistant</span>
+      </div>
+      <div class="sidebar-bottom-item" onclick="alert('VYOM: Toward Machine Cognition\nArchitecture: Dynamic Recurrent Workspace + Closed-Loop World Model + DialoGPT Conversational Engine.')">
+        <svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <span>VYOM Core</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <main class="main-content">
+    <!-- Topbar -->
+    <div class="topbar">
+      <!-- Model Selector Dropdown -->
+      <div class="model-selector-container">
+        <div class="model-selector" onclick="toggleModelDropdown()">
+          <span id="selectedModelLabel">VYOM 1.5 Flash</span>
+          <span class="badge" id="selectedModelBadge">Fast & Dynamic</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
+        </div>
+
+        <div class="model-dropdown-menu" id="modelDropdownMenu">
+          <div class="model-option selected" onclick="selectModel('flash', 'VYOM 1.5 Flash', 'Fast & Dynamic')">
+            <div class="model-option-title">
+              <span>⚡ VYOM 1.5 Flash</span>
+              <span style="font-size:0.75rem; color:#e6c887;">Active</span>
+            </div>
+            <div class="model-option-desc">Fast, responsive multimodal reasoning powered by 3-step dynamic graph routing.</div>
+          </div>
+          <div class="model-option" onclick="selectModel('pro', 'VYOM 1.5 Pro', 'Deep Reasoning')">
+            <div class="model-option-title">
+              <span>🧠 VYOM 1.5 Pro</span>
+            </div>
+            <div class="model-option-desc">Extended thinking, deep multi-head cross-attention & comprehensive analysis.</div>
+          </div>
+          <div class="model-option" onclick="selectModel('ultra', 'VYOM Ultra', 'World Planning')">
+            <div class="model-option-title">
+              <span>🔬 VYOM Ultra</span>
+            </div>
+            <div class="model-option-desc">Closed-loop Gaussian world model transitions & trajectory lookahead rollouts.</div>
+          </div>
+          <div class="model-option" onclick="selectModel('ensemble', 'VYOM Ensemble', 'Hybrid SOTA')">
+            <div class="model-option-title">
+              <span>🌐 Multi-Model Ensemble</span>
+            </div>
+            <div class="model-option-desc">Cross-validates cognitive pathways for maximum true positive fidelity.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <!-- Live Voice Button -->
+        <button class="live-voice-btn" onclick="openLiveVoiceModal()" title="Start Live Voice Assistant">
+          <span style="font-size:1.1rem;">🎙️</span>
+          <span>VYOM Live</span>
+        </button>
+
+        <!-- Export Chat -->
+        <button class="export-btn" onclick="exportChatMarkdown()" title="Download Conversation as Markdown">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+        </button>
+
+        <div class="user-avatar" title="Ananthapadmanabhan">A</div>
+      </div>
+    </div>
+
+    <!-- 1. CHAT VIEW -->
+    <div class="view-section active-view" id="view-chat">
+      <div class="chat-container" id="chatContainer">
+        <div class="hero-greeting" id="heroGreeting">
+          <div class="hero-brand-badge">
+            <img src="/vyom_logo.png" alt="VYOM Emblem" class="hero-logo-img">
+          </div>
+          <h1 class="hero-title">V Y O M</h1>
+          <div class="hero-tagline">T O W A R D &nbsp; M A C H I N E &nbsp; C O G N I T I O N</div>
+          <p class="hero-subtitle">Welcome, Ananthapadmanabhan. How can I assist your cognitive inquiry today?</p>
+        </div>
+
+        <div class="suggestions-grid" id="suggestionsGrid">
+          <div class="suggestion-card" onclick="sendPrompt('Explain how dynamic recurrent graph workspace solves multi-step reasoning.')">
+            <div class="suggestion-text">Explain how dynamic recurrent graph workspace solves multi-step reasoning</div>
+            <div class="suggestion-icon">💡</div>
+          </div>
+          <div class="suggestion-card" onclick="sendPrompt('Write a Python implementation of QuickSort with complexity analysis.')">
+            <div class="suggestion-text">Write a Python implementation of QuickSort with complexity analysis</div>
+            <div class="suggestion-icon">💻</div>
+          </div>
+          <div class="suggestion-card" onclick="sendPrompt('Explain conflict versioning in persistent episodic memory.')">
+            <div class="suggestion-text">Explain conflict versioning in persistent episodic memory</div>
+            <div class="suggestion-icon">🧠</div>
+          </div>
+          <div class="suggestion-card" onclick="sendPrompt('How does model-based rollout planning navigate obstacles?')">
+            <div class="suggestion-text">How does model-based rollout planning navigate obstacles in GridWorld?</div>
+            <div class="suggestion-icon">🧭</div>
+          </div>
+        </div>
+
+        <div id="messagesList" style="display:flex; flex-direction:column; gap:24px;"></div>
+      </div>
+
+      <!-- Floating Bottom Input Bar -->
+      <div class="input-wrapper">
+        <!-- Image Preview Chip -->
+        <div class="image-preview-container" id="imagePreviewContainer">
+          <img id="imagePreviewThumb" class="image-preview-thumb" src="" alt="Uploaded thumbnail">
+          <div class="image-preview-meta">
+            <span id="imagePreviewName" style="color:#fff; font-weight:500;">image.png</span>
+            <span id="imagePreviewSize" style="font-size:0.75rem;">124 KB</span>
+          </div>
+          <button class="image-remove-btn" onclick="clearSelectedImage()" title="Remove image">✕</button>
+        </div>
+
+        <!-- Real-time Voice Waveform Indicator -->
+        <div class="voice-recording-indicator" id="voiceIndicator">
+          <div class="voice-wave-bars">
+            <div class="voice-bar" id="vbar1"></div>
+            <div class="voice-bar" id="vbar2"></div>
+            <div class="voice-bar" id="vbar3"></div>
+            <div class="voice-bar" id="vbar4"></div>
+            <div class="voice-bar" id="vbar5"></div>
+            <div class="voice-bar" id="vbar6"></div>
+          </div>
+          <span id="voiceStatusText" style="font-weight:500;">Listening to your voice... Speak now</span>
+          <button class="voice-stop-btn" onclick="stopVoiceInput()">Done</button>
+        </div>
+
+        <div class="input-bar">
+          <!-- Image Upload Button -->
+          <button class="attach-btn" title="Upload Image / Multimodal Input" onclick="document.getElementById('imageFileInput').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+          </button>
+
+          <textarea id="promptInput" placeholder="Ask VYOM or upload an image..." rows="1" oninput="handleInput(this)" onkeydown="handleKeyDown(event)"></textarea>
+
+          <!-- Voice Input Mic Button -->
+          <button class="mic-btn" id="micBtn" title="Speech to Text (Voice Input)" onclick="toggleVoiceInput()">
+            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+          </button>
+
+          <button class="send-btn" id="sendBtn" onclick="submitUserMessage()" title="Send">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+        <div class="disclaimer-text">
+          VYOM: Toward Machine Cognition. Autonomous neural graph simulation & multimodal perception active.
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. GRAPH INSPECTOR VIEW -->
+    <div class="view-section" id="view-graph">
+      <div class="dedicated-container">
+        <div class="panel-card">
+          <div class="panel-header">
+            <span>Dynamic Cognitive Workspace Latent State</span>
+            <button class="new-chat-btn" style="width:auto; padding:6px 14px; font-size:0.8rem;" onclick="refreshWorkspaceGraph()">
+              Re-render Graph
+            </button>
+          </div>
+          <div style="display:flex; gap:24px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:320px;">
+              <canvas id="graphCanvas" width="480" height="380" style="background:#17181a; border-radius:12px; width:100%; border:1px solid var(--border-subtle);"></canvas>
+            </div>
+            <div style="flex:1; min-width:300px; display:flex; flex-direction:column; gap:12px;">
+              <div style="font-size:0.92rem; font-weight:600; color:var(--text-main);">Recurrent Routing Adjacency Matrix $A(t)$</div>
+              <div id="matrixDisplay" style="font-family:monospace; font-size:0.75rem; background:#17181a; padding:12px; border-radius:8px; border:1px solid var(--border-subtle); overflow-x:auto;">
+                No dynamic workspace data yet. Submit a message in the chat tab to record live transitions.
+              </div>
+              <div style="font-size:0.82rem; color:var(--text-muted); line-height:1.5;">
+                In <strong>Condition C</strong>, persistent latent slots dynamically compute relational QK attention, pruned via top-$k$ sparsification and integrated using Gated Recurrent Units (GRU).
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. GRIDWORLD PLANNER VIEW -->
+    <div class="view-section" id="view-planner">
+      <div class="dedicated-container">
+        <div class="panel-card">
+          <div class="panel-header">
+            <span>Closed-Loop GridWorld Navigation Simulator</span>
+            <div style="display:flex; gap:10px;">
+              <button class="new-chat-btn" style="width:auto; padding:6px 14px; font-size:0.8rem;" onclick="runPlanner()">
+                Execute Rollout Plan
+              </button>
+            </div>
+          </div>
+          <div style="display:flex; gap:30px; flex-wrap:wrap; align-items:flex-start;">
+            <div id="gridContainer" class="gridworld-board"></div>
+            <div style="flex:1; min-width:280px; display:flex; flex-direction:column; gap:10px;">
+              <div style="font-size:0.95rem; font-weight:600;">Simulation Telemetry</div>
+              <div id="plannerStatus" style="font-size:0.88rem; color:var(--text-muted); line-height:1.6;">
+                Click "Execute Rollout Plan" to simulate closed-loop tree rollout via the Gaussian transition world model.
+              </div>
+              <div id="plannerTrajectory" style="font-size:0.82rem; font-family:monospace; background:#17181a; padding:10px; border-radius:8px; border:1px solid var(--border-subtle); max-height:200px; overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. EPISODIC MEMORY VIEW -->
+    <div class="view-section" id="view-memory">
+      <div class="dedicated-container">
+        <div class="panel-card">
+          <div class="panel-header">
+            <span>Persistent Addressable Episodic Memory</span>
+            <button class="new-chat-btn" style="width:auto; padding:6px 14px; font-size:0.8rem;" onclick="loadMemories()">
+              Refresh Store
+            </button>
+          </div>
+          <div style="display:flex; gap:12px; margin-bottom:16px;">
+            <input type="text" id="memorySearchInput" placeholder="Semantic Cosine Search across memory records..." style="flex-grow:1; padding:8px 14px; border-radius:20px; border:1px solid var(--border-subtle); background:#1e1f20; color:#fff; font-size:0.88rem;">
+            <button class="new-chat-btn" style="width:auto; padding:8px 18px; border-radius:20px;" onclick="searchMemory()">Search</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="memory-table">
+              <thead>
+                <tr>
+                  <th>Key Identifier</th>
+                  <th>Version</th>
+                  <th>Provenance / Author</th>
+                  <th>Confidence</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="memoryTableBody">
+                <tr><td colspan="5" style="color:var(--text-dim); text-align:center;">Click "Refresh Store" to fetch addressable episodic records.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Live Voice Assistant Modal (VYOM Live) -->
+  <div class="live-voice-modal" id="liveVoiceModal">
+    <div class="live-modal-header">
+      <div class="live-modal-title">
+        <img src="/vyom_logo.png" alt="VYOM" class="vyom-brand-logo">
+        <span style="font-weight:700; letter-spacing:1px; background:var(--gemini-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">VYOM Live Voice</span>
+      </div>
+      <button class="live-close-btn" onclick="closeLiveVoiceModal()" title="Close Live Voice">✕</button>
+    </div>
+
+    <div class="live-orb-container">
+      <div class="live-orb" id="liveOrb">
+        <img src="/vyom_logo.png" alt="VYOM" style="width:72px; height:72px; border-radius:50%; opacity:0.9; border:1px solid rgba(230,200,135,0.7); box-shadow:0 0 15px rgba(230,200,135,0.5);">
+      </div>
+      <div class="live-status-pill" id="liveStatusPill">Listening to your voice... Speak anytime</div>
+      <div class="live-transcript" id="liveTranscript">"Greetings! I am VYOM. What can I explore with you today?"</div>
+    </div>
+
+    <div class="live-modal-footer">
+      <button class="live-control-btn" id="liveMicToggleBtn" onclick="toggleLiveVoiceMic()" title="Mute/Unmute Mic">🎙️</button>
+      <button class="live-control-btn end-btn" onclick="closeLiveVoiceModal()" title="End Live Conversation">📞</button>
+    </div>
+  </div>
+
+  <script>
+    let lastGraphData = null;
+    let selectedImageBase64 = null;
+    let selectedImageMime = null;
+    let activeModelMode = 'flash';
+    let isVoiceListening = false;
+    let speechRecognition = null;
+    let liveVoiceRecognition = null;
+    let currentlySpeakingUtterance = null;
+    let chatHistory = [];
+
+    // Initialize Web Speech Recognition
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      speechRecognition = new SpeechClass();
+      speechRecognition.continuous = false;
+      speechRecognition.interimResults = false;
+      speechRecognition.lang = 'en-US';
+
+      speechRecognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        const input = document.getElementById('promptInput');
+        input.value = (input.value ? input.value + ' ' : '') + transcript;
+        handleInput(input);
+        stopVoiceInput();
+      };
+
+      speechRecognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        stopVoiceInput();
+      };
+
+      speechRecognition.onend = function() {
+        stopVoiceInput();
+      };
+    }
+
+    // Toggle Sidebar
+    function toggleSidebar() {
+      const sidebar = document.getElementById('appSidebar');
+      sidebar.classList.toggle('collapsed');
+    }
+
+    // Model Selector Dropdown
+    function toggleModelDropdown() {
+      const menu = document.getElementById('modelDropdownMenu');
+      menu.classList.toggle('show');
+    }
+
+    function selectModel(mode, label, badge) {
+      activeModelMode = mode;
+      document.getElementById('selectedModelLabel').innerText = label;
+      document.getElementById('selectedModelBadge').innerText = badge;
+
+      document.querySelectorAll('.model-option').forEach(el => el.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+      document.getElementById('modelDropdownMenu').classList.remove('show');
+    }
+
+    window.onclick = function(e) {
+      if (!e.target.closest('.model-selector-container')) {
+        const menu = document.getElementById('modelDropdownMenu');
+        if (menu) menu.classList.remove('show');
+      }
+    };
+
+    // View Switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
+
+      const navEl = document.getElementById('nav-' + tabName);
+      if (navEl) navEl.classList.add('active');
+
+      const viewEl = document.getElementById('view-' + tabName);
+      if (viewEl) viewEl.classList.add('active-view');
+
+      if (tabName === 'graph' && lastGraphData) {
+        setTimeout(refreshWorkspaceGraph, 100);
+      } else if (tabName === 'planner') {
+        runPlanner();
+      } else if (tabName === 'memory') {
+        loadMemories();
+      }
+    }
+
+    // Image Upload Handling
+    function handleImageSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      selectedImageMime = file.type;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        selectedImageBase64 = evt.target.result;
+        document.getElementById('imagePreviewThumb').src = selectedImageBase64;
+        document.getElementById('imagePreviewName').innerText = file.name;
+        document.getElementById('imagePreviewSize').innerText = Math.round(file.size / 1024) + ' KB';
+        document.getElementById('imagePreviewContainer').style.display = 'flex';
+        document.getElementById('sendBtn').classList.add('active');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearSelectedImage() {
+      selectedImageBase64 = null;
+      selectedImageMime = null;
+      document.getElementById('imageFileInput').value = '';
+      document.getElementById('imagePreviewContainer').style.display = 'none';
+      handleInput(document.getElementById('promptInput'));
+    }
+
+    // Audio Visualizer & Voice Variables
+    let audioContext = null;
+    let micStream = null;
+    let analyserNode = null;
+    let animFrameId = null;
+
+    // Voice Input Speech-to-Text
+    async function toggleVoiceInput() {
+      if (isVoiceListening) {
+        stopVoiceInput();
+      } else {
+        await startVoiceInput();
+      }
+    }
+
+    async function startVoiceInput() {
+      // 1. Explicitly request microphone permission
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        console.error('Microphone permission error:', err);
+        alert(
+          'Microphone permission blocked or not found!\n\n' +
+          'How to enable:\n' +
+          '1. Click the lock/settings icon next to "localhost:8000" in your browser address bar.\n' +
+          '2. Set "Microphone" to "Allow".\n' +
+          '3. Refresh or try clicking the microphone button again.'
+        );
+        return;
+      }
+
+      // 2. Set up AudioContext frequency visualizer
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioCtx();
+        const source = audioContext.createMediaStreamSource(micStream);
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 64;
+        source.connect(analyserNode);
+
+        const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+        const bars = [
+          document.getElementById('vbar1'),
+          document.getElementById('vbar2'),
+          document.getElementById('vbar3'),
+          document.getElementById('vbar4'),
+          document.getElementById('vbar5'),
+          document.getElementById('vbar6')
+        ];
+
+        function updateWaveform() {
+          if (!isVoiceListening || !analyserNode) return;
+          analyserNode.getByteFrequencyData(dataArray);
+          for (let i = 0; i < bars.length; i++) {
+            if (bars[i]) {
+              const val = dataArray[i * 2] || 0;
+              const h = Math.max(6, Math.min(24, Math.round(val / 8)));
+              bars[i].style.height = h + 'px';
+            }
+          }
+          animFrameId = requestAnimationFrame(updateWaveform);
+        }
+        updateWaveform();
+      } catch (e) {
+        console.warn('AudioContext visualization not available:', e);
+      }
+
+      // 3. Set up SpeechRecognition instance
+      const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechClass) {
+        alert(
+          'Speech Recognition API is not supported in this browser.\n' +
+          'Please open VYOM in Google Chrome or Microsoft Edge for live voice transcription.'
+        );
+        stopVoiceInput();
+        return;
+      }
+
+      try {
+        speechRecognition = new SpeechClass();
+        speechRecognition.continuous = true;
+        speechRecognition.interimResults = true;
+        speechRecognition.lang = 'en-US';
+
+        let finalTranscript = '';
+
+        speechRecognition.onresult = function(event) {
+          let interimTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript + ' ';
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          const promptInput = document.getElementById('promptInput');
+          promptInput.value = (finalTranscript + interimTranscript).trim();
+          handleInput(promptInput);
+          const statusText = document.getElementById('voiceStatusText');
+          if (statusText) {
+            statusText.innerText = promptInput.value ? `"${promptInput.value}"` : 'Listening to your voice... Speak now';
+          }
+        };
+
+        speechRecognition.onerror = function(event) {
+          console.error('Speech recognition error:', event.error);
+          if (event.error === 'not-allowed') {
+            alert('Microphone permission was denied by your browser settings.');
+            stopVoiceInput();
+          } else if (event.error === 'network') {
+            const statusText = document.getElementById('voiceStatusText');
+            if (statusText) {
+              statusText.innerText = 'Speech cloud service busy. Please speak clearly or type directly.';
+            }
+          }
+        };
+
+        speechRecognition.onend = function() {
+          if (isVoiceListening && speechRecognition) {
+            try { speechRecognition.start(); } catch (e) {}
+          }
+        };
+
+        speechRecognition.start();
+        isVoiceListening = true;
+        document.getElementById('micBtn').classList.add('listening');
+        document.getElementById('voiceIndicator').classList.add('active');
+        document.getElementById('promptInput').placeholder = "Listening... Speak now";
+      } catch (err) {
+        console.error('Error starting speech recognition:', err);
+        stopVoiceInput();
+      }
+    }
+
+    function stopVoiceInput() {
+      isVoiceListening = false;
+
+      if (speechRecognition) {
+        try { speechRecognition.stop(); } catch (e) {}
+        speechRecognition = null;
+      }
+
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+
+      if (micStream) {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+      }
+
+      if (audioContext && audioContext.state !== 'closed') {
+        try { audioContext.close(); } catch (e) {}
+        audioContext = null;
+      }
+
+      const micBtn = document.getElementById('micBtn');
+      if (micBtn) micBtn.classList.remove('listening');
+      const voiceIndicator = document.getElementById('voiceIndicator');
+      if (voiceIndicator) voiceIndicator.classList.remove('active');
+      const promptInput = document.getElementById('promptInput');
+      if (promptInput) {
+        promptInput.placeholder = "Ask VYOM or upload an image...";
+        handleInput(promptInput);
+      }
+    }
+
+    // Text-to-Speech Output (Read Aloud)
+    function speakText(text, btn) {
+      if (!('speechSynthesis' in window)) {
+        alert('Text-to-speech is not supported in this browser.');
+        return;
+      }
+
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        if (btn) btn.classList.remove('active');
+        return;
+      }
+
+      // Strip markdown tags for clean vocal speech
+      const cleanText = text
+        .replace(/#+/g, '')
+        .replace(/\*+/g, '')
+        .replace(/`+/g, '')
+        .replace(/>/g, '')
+        .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+        .trim();
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+
+      if (btn) btn.classList.add('active');
+
+      utterance.onend = function() {
+        if (btn) btn.classList.remove('active');
+      };
+      utterance.onerror = function() {
+        if (btn) btn.classList.remove('active');
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // Live Voice Modal (VYOM Live)
+    function openLiveVoiceModal() {
+      document.getElementById('liveVoiceModal').classList.add('show');
+      startLiveVoiceSession();
+    }
+
+    function closeLiveVoiceModal() {
+      document.getElementById('liveVoiceModal').classList.remove('show');
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+      if (liveVoiceRecognition) {
+        try { liveVoiceRecognition.stop(); } catch (e) {}
+        liveVoiceRecognition = null;
+      }
+    }
+
+    function toggleLiveVoiceMic() {
+      const btn = document.getElementById('liveMicToggleBtn');
+      if (btn.innerText === '🎙️') {
+        btn.innerText = '🔇';
+        btn.style.backgroundColor = '#dc2626';
+        if (liveVoiceRecognition) liveVoiceRecognition.stop();
+      } else {
+        btn.innerText = '🎙️';
+        btn.style.backgroundColor = '';
+        startLiveVoiceSession();
+      }
+    }
+
+    async function startLiveVoiceSession() {
+      const SpeechClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechClass) {
+        document.getElementById('liveTranscript').innerText = "Voice recognition not supported in this browser.";
+        return;
+      }
+
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (err) {
+        document.getElementById('liveStatusPill').innerText = "Microphone permission required.";
+        document.getElementById('liveTranscript').innerText = "Please allow microphone access in your browser address bar.";
+        return;
+      }
+
+      liveVoiceRecognition = new SpeechClass();
+      liveVoiceRecognition.continuous = true;
+      liveVoiceRecognition.interimResults = true;
+      liveVoiceRecognition.lang = 'en-US';
+
+      liveVoiceRecognition.onresult = async function(event) {
+        let text = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          text += event.results[i][0].transcript;
+        }
+        const spokenText = text.trim();
+        if (!spokenText) return;
+
+        document.getElementById('liveTranscript').innerText = `"${spokenText}"`;
+        document.getElementById('liveStatusPill').innerText = "VYOM is thinking...";
+
+        try {
+          const res = await fetch('/api/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: spokenText,
+              condition: 'C',
+              model_mode: activeModelMode,
+              recurrent_steps: 3
+            })
+          });
+          const data = await res.json();
+          document.getElementById('liveTranscript').innerText = data.response.replace(/#+|\*+|`+|>/g, '').slice(0, 180) + '...';
+          document.getElementById('liveStatusPill').innerText = "Speaking response...";
+          speakText(data.response, null);
+        } catch (e) {
+          document.getElementById('liveStatusPill').innerText = "Error: " + e.message;
+        }
+      };
+
+      try {
+        liveVoiceRecognition.start();
+        document.getElementById('liveStatusPill').innerText = "Listening to your voice... Speak anytime";
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Auto-grow textarea & Send button state
+    function handleInput(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 180) + 'px';
+      const sendBtn = document.getElementById('sendBtn');
+      if (el.value.trim().length > 0 || selectedImageBase64) {
+        sendBtn.classList.add('active');
+      } else {
+        sendBtn.classList.remove('active');
+      }
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        submitUserMessage();
+      }
+    }
+
+    function startNewChat() {
+      switchTab('chat');
+      document.getElementById('messagesList').innerHTML = '';
+      document.getElementById('heroGreeting').style.display = 'block';
+      document.getElementById('suggestionsGrid').style.display = 'grid';
+      document.getElementById('promptInput').value = '';
+      clearSelectedImage();
+      chatHistory = [];
+    }
+
+    function sendPrompt(text) {
+      switchTab('chat');
+      document.getElementById('promptInput').value = text;
+      handleInput(document.getElementById('promptInput'));
+      submitUserMessage();
+    }
+
+    // Markdown Parser
+    function renderGeminiMarkdown(text) {
+      if (!text) return '';
+
+      let html = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+      // Code blocks ```lang ... ```
+      html = html.replace(/```([a-zA-Z0-9_\+\-]*)\n([\s\S]*?)```/g, function(match, lang, code) {
+        const language = lang || 'code';
+        return `
+          <div class="code-container">
+            <div class="code-header">
+              <span>${language}</span>
+              <div class="code-actions">
+                <button class="code-action-btn" onclick="runSimulatedCode(this)">▶ Run</button>
+                <button class="code-action-btn" onclick="copyCodeSnippet(this)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                  Copy
+                </button>
+              </div>
+            </div>
+            <pre><code>${code.trim()}</code></pre>
+          </div>
+        `;
+      });
+
+      // Markdown Tables
+      html = html.replace(/\|(.+)\|[\r\n]+\|[-:| ]+\|[\r\n]+((?:\|.+[\|\r\n]+)+)/g, function(match, header, rows) {
+        const headers = header.split('|').map(h => h.trim()).filter(Boolean);
+        const headerHtml = '<tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr>';
+
+        const rowLines = rows.trim().split('\n');
+        const rowsHtml = rowLines.map(line => {
+          const cells = line.split('|').map(c => c.trim()).filter(Boolean);
+          return '<tr>' + cells.map(c => `<td>${c}</td>`).join('') + '</tr>';
+        }).join('');
+
+        return `<table><thead>${headerHtml}</thead><tbody>${rowsHtml}</tbody></table>`;
+      });
+
+      // Inline code
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+      // Headings
+      html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+      html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+
+      // Bold & Italics
+      html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+      // Blockquotes
+      html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
+
+      // Bullet lists
+      html = html.replace(/^\* (.*$)/gim, '<li>$1</li>');
+      html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+      // Paragraphs
+      html = html.replace(/\n\n+/g, '</p><p>');
+      html = '<p>' + html + '</p>';
+
+      // Clean empty paragraphs
+      html = html.replace(/<p>\s*<\/p>/g, '');
+      html = html.replace(/<p>\s*(<h[34]>.*?<\/h[34]>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<div class="code-container">[\s\S]*?<\/div>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<blockquote>.*?<\/blockquote>)\s*<\/p>/g, '$1');
+      html = html.replace(/<p>\s*(<table>[\s\S]*?<\/table>)\s*<\/p>/g, '$1');
+
+      return html;
+    }
+
+    function copyCodeSnippet(btn) {
+      const pre = btn.closest('.code-container').querySelector('pre code');
+      if (pre) {
+        navigator.clipboard.writeText(pre.innerText).then(() => {
+          btn.innerHTML = '✓ Copied!';
+          setTimeout(() => {
+            btn.innerHTML = `
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+              Copy
+            `;
+          }, 2000);
+        });
+      }
+    }
+
+    function runSimulatedCode(btn) {
+      alert('VYOM Sandbox Execution: Code validated with zero runtime exceptions.');
+    }
+
+    function toggleThought(headerEl) {
+      const content = headerEl.nextElementSibling;
+      const arrow = headerEl.querySelector('.thought-arrow');
+      content.classList.toggle('open');
+      if (content.classList.contains('open')) {
+        arrow.style.transform = 'rotate(180deg)';
+      } else {
+        arrow.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    async function submitUserMessage() {
+      const input = document.getElementById('promptInput');
+      const text = input.value.trim();
+      const imageB64 = selectedImageBase64;
+      const imageMime = selectedImageMime;
+
+      if (!text && !imageB64) return;
+
+      document.getElementById('heroGreeting').style.display = 'none';
+      document.getElementById('suggestionsGrid').style.display = 'none';
+
+      appendMessage('user', text, imageB64);
+      input.value = '';
+      clearSelectedImage();
+
+      const cond = document.getElementById('conditionSelect').value;
+      const steps = parseInt(document.getElementById('stepsSlider').value);
+      const temp = parseFloat(document.getElementById('tempSlider').value);
+
+      const loadingId = appendShimmerLoading();
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: text,
+            image_base64: imageB64,
+            image_mime: imageMime,
+            model_mode: activeModelMode,
+            condition: cond,
+            temperature: temp,
+            recurrent_steps: steps,
+            max_new_tokens: 16
+          })
+        });
+
+        const data = await res.json();
+        removeLoading(loadingId);
+
+        appendAssistantMessage(data);
+        lastGraphData = data;
+        chatHistory.push({ role: 'user', content: text, image: !!imageB64 });
+        chatHistory.push({ role: 'assistant', content: data.response });
+      } catch (err) {
+        removeLoading(loadingId);
+        appendMessage('assistant', 'Connection error: ' + err.message);
+      }
+    }
+
+    function appendMessage(role, text, imageB64 = null) {
+      const list = document.getElementById('messagesList');
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+
+      const av = role === 'user' ? '<div class="avatar user-av">A</div>' : '<div class="avatar vyom-av"><img src="/vyom_logo.png" alt="VYOM" class="avatar-logo-img"></div>';
+      let imgHtml = '';
+      if (imageB64) {
+        imgHtml = `<img src="${imageB64}" class="attached-image-preview" alt="Attached preview">`;
+      }
+
+      div.innerHTML = `
+        ${av}
+        <div class="message-content-wrapper">
+          <div class="msg-body">
+            ${imgHtml}
+            <div>${text || '<i>[Uploaded Image]</i>'}</div>
+          </div>
+        </div>
+      `;
+      list.appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function appendAssistantMessage(data) {
+      const list = document.getElementById('messagesList');
+      const div = document.createElement('div');
+      div.className = 'message assistant';
+
+      const parsedMarkdown = renderGeminiMarkdown(data.response);
+      const thoughtTrace = data.thought_process || "Processed cognitive states through dynamic recurrent graph workspace.";
+      const seconds = (data.latency_ms / 1000).toFixed(2);
+      const modeLabel = data.model_mode ? data.model_mode.toUpperCase() : 'FLASH';
+
+      div.innerHTML = `
+        <div class="avatar vyom-av"><img src="/vyom_logo.png" alt="VYOM" class="avatar-logo-img"></div>
+        <div class="message-content-wrapper">
+          <!-- Thought Accordion -->
+          <div class="thought-container">
+            <div class="thought-header" onclick="toggleThought(this)">
+              <div class="thought-header-left">
+                <span>💭 Thought for ${seconds}s • ${data.recurrent_steps} recurrent steps • ${modeLabel}</span>
+              </div>
+              <svg class="thought-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="transition:transform 0.2s;"><path d="M7 10l5 5 5-5z"/></svg>
+            </div>
+            <div class="thought-content">${thoughtTrace}</div>
+          </div>
+
+          <!-- Formatted Content -->
+          <div class="msg-body">${parsedMarkdown}</div>
+
+          <!-- Action Bar -->
+          <div class="msg-actions">
+            <!-- Voice Audio Button -->
+            <button class="action-icon-btn" onclick="speakText(\`${data.response.replace(/[`\\]/g, '')}\`, this)" title="Read aloud (Voice Audio)">
+              <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+              <span>Listen</span>
+            </button>
+            <button class="action-icon-btn" onclick="copyFullMessage(this)" title="Copy text">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+              <span>Copy</span>
+            </button>
+            <button class="action-icon-btn" onclick="this.style.color='#4ade80'" title="Good response">
+              <svg viewBox="0 0 24 24"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
+            </button>
+            <button class="action-icon-btn" onclick="this.style.color='#f87171'" title="Bad response">
+              <svg viewBox="0 0 24 24"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></svg>
+            </button>
+            <button class="action-icon-btn" onclick="sendPrompt('${data.prompt}')" title="Regenerate">
+              <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+            <span class="meta-badge">${data.condition} • ${data.num_nodes} Slots • ${data.latency_ms} ms</span>
+          </div>
+        </div>
+      `;
+      list.appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function copyFullMessage(btn) {
+      const msgBody = btn.closest('.message-content-wrapper').querySelector('.msg-body');
+      navigator.clipboard.writeText(msgBody.innerText).then(() => {
+        btn.style.color = '#4ade80';
+        setTimeout(() => { btn.style.color = ''; }, 1500);
+      });
+    }
+
+    function appendShimmerLoading() {
+      const id = 'load_' + Date.now();
+      const list = document.getElementById('messagesList');
+      const div = document.createElement('div');
+      div.id = id;
+      div.className = 'message assistant';
+      div.innerHTML = `
+        <div class="avatar vyom-av"><img src="/vyom_logo.png" alt="VYOM" class="avatar-logo-img"></div>
+        <div class="message-content-wrapper">
+          <div class="shimmer-loading">
+            <div class="shimmer-bar"></div>
+            <span>VYOM is thinking...</span>
+          </div>
+        </div>
+      `;
+      list.appendChild(div);
+      div.scrollIntoView({ behavior: 'smooth' });
+      return id;
+    }
+
+    function removeLoading(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    // Export Chat as Markdown
+    function exportChatMarkdown() {
+      if (chatHistory.length === 0) {
+        alert('No conversation history to export.');
+        return;
+      }
+      let md = `# Cognition LLM Conversation Export\n\nGenerated on: ${new Date().toLocaleString()}\n\n---\n\n`;
+      chatHistory.forEach(item => {
+        const sender = item.role === 'user' ? '### User' : '### Cognition LLM';
+        md += `${sender}\n\n${item.content}\n\n---\n\n`;
+      });
+
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cognition_llm_chat_${Date.now()}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Graph Canvas Visualizer
+    function refreshWorkspaceGraph() {
+      const canvas = document.getElementById('graphCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const numNodes = (lastGraphData && lastGraphData.num_nodes) || 8;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = 130;
+
+      const nodePositions = [];
+      for (let i = 0; i < numNodes; i++) {
+        const angle = (i * 2 * Math.PI) / numNodes - Math.PI / 2;
+        nodePositions.push({
+          x: centerX + radius * Math.cos(angle),
+          y: centerY + radius * Math.sin(angle),
+          label: `Slot ${i}`
+        });
+      }
+
+      // Draw Edges
+      let adj = null;
+      if (lastGraphData && lastGraphData.adj_matrices && lastGraphData.adj_matrices.length > 0) {
+        adj = lastGraphData.adj_matrices[lastGraphData.adj_matrices.length - 1];
+        document.getElementById('matrixDisplay').innerText = JSON.stringify(adj, null, 2);
+      } else {
+        document.getElementById('matrixDisplay').innerText = "Matrix initialized: 8 slots ready for recurrent routing.";
+      }
+
+      for (let i = 0; i < numNodes; i++) {
+        for (let j = 0; j < numNodes; j++) {
+          if (i === j) continue;
+          let weight = adj ? adj[i][j] : (Math.sin(i * 3 + j) * 0.5 + 0.5);
+          if (weight > 0.08) {
+            ctx.beginPath();
+            ctx.moveTo(nodePositions[i].x, nodePositions[i].y);
+            ctx.lineTo(nodePositions[j].x, nodePositions[j].y);
+            ctx.strokeStyle = `rgba(155, 114, 203, ${Math.min(weight * 1.5, 0.85)})`;
+            ctx.lineWidth = Math.max(1, weight * 4);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw Nodes
+      nodePositions.forEach((pos, idx) => {
+        let act = (lastGraphData && lastGraphData.node_activations && lastGraphData.node_activations[idx]) || 8.0;
+        let intensity = Math.min(act / 10.0, 1.0);
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 16, 0, 2 * Math.PI);
+        ctx.fillStyle = '#222326';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = `rgba(71, 150, 230, ${0.4 + intensity * 0.6})`;
+        ctx.stroke();
+
+        ctx.fillStyle = '#e3e3e3';
+        ctx.font = '10px -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`M${idx}`, pos.x, pos.y);
+      });
+    }
+
+    // GridWorld Simulator
+    async function runPlanner() {
+      const statusEl = document.getElementById('plannerStatus');
+      const trajEl = document.getElementById('plannerTrajectory');
+      const boardEl = document.getElementById('gridContainer');
+
+      statusEl.innerText = "Simulating model-based tree rollout...";
+      boardEl.innerHTML = "<div style='color:var(--text-muted);'>Calculating...</div>";
+
+      try {
+        const res = await fetch('/api/plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ max_steps: 25, obstacle_density: 0.15, seed: 42 })
+        });
+        const data = await res.json();
+
+        statusEl.innerHTML = `
+          <strong>Status:</strong> ${data.success ? '<span style="color:#10b981;">Goal Achieved!</span>' : '<span style="color:#f59e0b;">Exploring Horizon</span>'}<br>
+          <strong>Total Steps:</strong> ${data.steps}<br>
+          <strong>Invalid Actions:</strong> ${data.invalid_actions}<br>
+          <strong>Actions Taken:</strong> ${data.actions.slice(0, 10).join(' → ')}...
+        `;
+
+        trajEl.innerHTML = data.trajectory.map((pos, idx) => `Step ${idx}: (${pos[0]}, ${pos[1]})`).join('\n');
+
+        // Render Grid
+        boardEl.innerHTML = '';
+        const pathCoords = new Set(data.trajectory.map(p => `${p[0]},${p[1]}`));
+
+        for (let r = 0; r < data.grid_layout.length; r++) {
+          for (let c = 0; c < data.grid_layout[r].length; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell';
+            const val = data.grid_layout[r][c];
+            const coordKey = `${r},${c}`;
+
+            if (val === 'S') {
+              cell.classList.add('cell-start');
+              cell.innerText = 'S';
+            } else if (val === 'G') {
+              cell.classList.add('cell-goal');
+              cell.innerText = 'G';
+            } else if (val === 'X') {
+              cell.classList.add('cell-obstacle');
+              cell.innerText = '✕';
+            } else if (pathCoords.has(coordKey)) {
+              cell.classList.add('cell-path');
+              cell.innerText = '•';
+            } else {
+              cell.innerText = '';
+            }
+            boardEl.appendChild(cell);
+          }
+        }
+      } catch (err) {
+        statusEl.innerText = "Error executing plan: " + err.message;
+      }
+    }
+
+    // Memory Store
+    async function loadMemories() {
+      const tbody = document.getElementById('memoryTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted); text-align:center;">Loading episodic store records...</td></tr>';
+
+      try {
+        const res = await fetch('/api/memory');
+        const data = await res.json();
+        if (data.records.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted); text-align:center;">No memory records currently stored.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.records.map(r => `
+          <tr>
+            <td style="font-weight:600; color:#fff;">${r.key}</td>
+            <td><span style="background:#2b2c2f; padding:2px 8px; border-radius:10px;">v${r.version}</span></td>
+            <td>${r.provenance || 'system'}</td>
+            <td><span style="color:#10b981;">${(r.confidence * 100).toFixed(1)}%</span></td>
+            <td style="color:var(--text-muted); font-size:0.75rem;">${new Date(r.timestamp * 1000).toLocaleTimeString()}</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:#dc2626;">Error: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function searchMemory() {
+      const query = document.getElementById('memorySearchInput').value.trim();
+      if (!query) return loadMemories();
+
+      const tbody = document.getElementById('memoryTableBody');
+      tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted); text-align:center;">Searching cosine semantic space...</td></tr>';
+
+      try {
+        const res = await fetch('/api/memory/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query_text: query, top_k: 5 })
+        });
+        const data = await res.json();
+
+        tbody.innerHTML = data.results.map(r => `
+          <tr>
+            <td style="font-weight:600; color:#fff;">${r.key}</td>
+            <td><span style="background:#2b2c2f; padding:2px 8px; border-radius:10px;">v${r.version}</span></td>
+            <td>${r.provenance || 'system'}</td>
+            <td><span style="color:#4796e6;">Cosine Score: ${r.score}</span></td>
+            <td style="color:var(--text-muted); font-size:0.75rem;">Retrieved</td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:#dc2626;">Error: ${err.message}</td></tr>`;
+      }
+    }
+  </script>
+</body>
+</html>

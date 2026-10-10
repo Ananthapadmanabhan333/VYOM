@@ -1,0 +1,61 @@
+experiment_name: "neurograph_tiny_smoketest"
+condition: "C"
+
+lm:
+  model_name_or_path: "mock"
+  freeze_base_model: true
+  use_lora: false
+  max_seq_len: 64
+  vocab_size: 256
+  d_model: 32
+  num_layers: 2
+  num_heads: 2
+
+workspace:
+  num_nodes: 4
+  node_dim: 32
+  recurrent_steps: 2
+  top_k_edges: null
+  dynamic_connectivity: true
+  use_layer_norm: true
+  dropout: 0.0
+  goal_dim: 16
+  uncertainty_dim: 8
+  num_heads: 2
+  gate_type: "gru"
+
+memory:
+  capacity: 100
+  memory_dim: 32
+  retrieval_top_k: 2
+  similarity_metric: "cosine"
+  decay_rate: 0.0
+
+world_model:
+  state_dim: 16
+  action_dim: 5
+  hidden_dim: 32
+  predict_uncertainty: true
+
+planner:
+  max_depth: 10
+  discount: 0.95
+  heuristic_weight: 1.0
+
+training:
+  learning_rate: 0.001
+  weight_decay: 0.01
+  batch_size: 2
+  gradient_accumulation_steps: 1
+  max_steps: 20
+  warmup_steps: 2
+  device: "cpu"
+  seed: 42
+  mixed_precision: false
+  gradient_checkpointing: false
+  loss_weights:
+    lm: 1.0
+    world: 0.5
+    action: 0.5
+    mem: 0.1
+    reg: 0.01

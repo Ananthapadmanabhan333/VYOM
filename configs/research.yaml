@@ -1,0 +1,64 @@
+experiment_name: "neurograph_research_experiment"
+condition: "C"
+
+lm:
+  model_name_or_path: "HuggingFaceTB/SmolLM2-135M"
+  freeze_base_model: true
+  use_lora: true
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+  max_seq_len: 256
+  vocab_size: 49152
+  d_model: 576
+  num_layers: 30
+  num_heads: 9
+
+workspace:
+  num_nodes: 8
+  node_dim: 64
+  recurrent_steps: 3
+  top_k_edges: 4
+  dynamic_connectivity: true
+  use_layer_norm: true
+  dropout: 0.1
+  goal_dim: 32
+  uncertainty_dim: 16
+  num_heads: 4
+  gate_type: "gru"
+
+memory:
+  capacity: 1000
+  memory_dim: 64
+  retrieval_top_k: 3
+  similarity_metric: "cosine"
+  decay_rate: 0.001
+
+world_model:
+  state_dim: 32
+  action_dim: 5
+  hidden_dim: 64
+  predict_uncertainty: true
+
+planner:
+  max_depth: 15
+  discount: 0.95
+  heuristic_weight: 1.0
+
+training:
+  learning_rate: 0.0003
+  weight_decay: 0.01
+  batch_size: 4
+  gradient_accumulation_steps: 2
+  max_steps: 100
+  warmup_steps: 10
+  device: "cpu"
+  seed: 42
+  mixed_precision: false
+  gradient_checkpointing: false
+  loss_weights:
+    lm: 1.0
+    world: 0.5
+    action: 0.5
+    mem: 0.1
+    reg: 0.01
