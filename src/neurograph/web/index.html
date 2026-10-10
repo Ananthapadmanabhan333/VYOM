@@ -1306,26 +1306,26 @@
       <!-- Model Selector Dropdown -->
       <div class="model-selector-container">
         <div class="model-selector" onclick="toggleModelDropdown()">
-          <span id="selectedModelLabel">VYOM 1.5 Flash</span>
+          <span id="selectedModelLabel">Vyom Fast</span>
           <span class="badge" id="selectedModelBadge">Fast & Dynamic</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>
         </div>
 
         <div class="model-dropdown-menu" id="modelDropdownMenu">
-          <div class="model-option selected" onclick="selectModel('flash', 'VYOM 1.5 Flash', 'Fast & Dynamic')">
+          <div class="model-option selected" onclick="selectModel('fast', 'Vyom Fast', 'Fast & Dynamic')">
             <div class="model-option-title">
-              <span>⚡ VYOM 1.5 Flash</span>
+              <span>⚡ Vyom Fast</span>
               <span style="font-size:0.75rem; color:#e6c887;">Active</span>
             </div>
             <div class="model-option-desc">Fast, responsive multimodal reasoning powered by 3-step dynamic graph routing.</div>
           </div>
-          <div class="model-option" onclick="selectModel('pro', 'VYOM 1.5 Pro', 'Deep Reasoning')">
+          <div class="model-option" onclick="selectModel('cognitive', 'Vyom Cognitive', 'Deep Reasoning')">
             <div class="model-option-title">
-              <span>🧠 VYOM 1.5 Pro</span>
+              <span>🧠 Vyom Cognitive</span>
             </div>
             <div class="model-option-desc">Extended thinking, deep multi-head cross-attention & comprehensive analysis.</div>
           </div>
-          <div class="model-option" onclick="selectModel('ultra', 'VYOM Ultra', 'World Planning')">
+          <div class="model-option" onclick="selectModel('adaptive', 'VYOM adaptive', 'World Planning')">
             <div class="model-option-title">
               <span>🔬 VYOM Ultra</span>
             </div>
@@ -1556,7 +1556,7 @@
     let lastGraphData = null;
     let selectedImageBase64 = null;
     let selectedImageMime = null;
-    let activeModelMode = 'flash';
+    let activeModelMode = 'fast';
     let isVoiceListening = false;
     let speechRecognition = null;
     let liveVoiceRecognition = null;
@@ -2098,57 +2098,46 @@
       }
     }
 
+    
     async function submitUserMessage() {
-      const input = document.getElementById('promptInput');
-      const text = input.value.trim();
-      const imageB64 = selectedImageBase64;
-      const imageMime = selectedImageMime;
-
-      if (!text && !imageB64) return;
-
-      document.getElementById('heroGreeting').style.display = 'none';
-      document.getElementById('suggestionsGrid').style.display = 'none';
-
-      appendMessage('user', text, imageB64);
-      input.value = '';
-      clearSelectedImage();
-
-      const cond = document.getElementById('conditionSelect').value;
-      const steps = parseInt(document.getElementById('stepsSlider').value);
-      const temp = parseFloat(document.getElementById('tempSlider').value);
-
-      const loadingId = appendShimmerLoading();
-
-      try {
-        const res = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: text,
-            image_base64: imageB64,
-            image_mime: imageMime,
-            model_mode: activeModelMode,
-            condition: cond,
-            temperature: temp,
-            recurrent_steps: steps,
-            max_new_tokens: 16
-          })
-        });
-
-        const data = await res.json();
-        removeLoading(loadingId);
-
-        appendAssistantMessage(data);
-        lastGraphData = data;
-        chatHistory.push({ role: 'user', content: text, image: !!imageB64 });
-        chatHistory.push({ role: 'assistant', content: data.response });
-      } catch (err) {
-        removeLoading(loadingId);
-        appendMessage('assistant', 'Connection error: ' + err.message);
-      }
+        const input = document.getElementById('promptInput');
+        const text = input.value.trim();
+        const imageB64 = selectedImageBase64;
+        
+        if (!text && !imageB64) return;
+        
+        document.getElementById('heroGreeting').style.display = 'none';
+        document.getElementById('suggestionsGrid').style.display = 'none';
+        
+        appendMessage('user', text, imageB64);
+        input.value = '';
+        clearSelectedImage();
+        
+        const loadingId = appendShimmerLoading();
+        
+        try {
+            const res = await fetch('/api/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: text,
+                    image_base64: imageB64,
+                    mode: activeModelMode || "fast"
+                })
+            });
+            const data = await res.json();
+            removeLoading(loadingId);
+            appendAssistantMessage(data.response, data.stats, data.telemetry, data.mode);
+        } catch (err) {
+            removeLoading(loadingId);
+            const errDiv = document.createElement('div');
+            errDiv.style.color = '#ef4444';
+            errDiv.innerText = 'Error: ' + err.message;
+            document.getElementById('messagesList').appendChild(errDiv);
+        }
     }
 
-    function appendMessage(role, text, imageB64 = null) {
+function appendMessage(role, text, imageB64 = null) {
       const list = document.getElementById('messagesList');
       const div = document.createElement('div');
       div.className = `message ${role}`;
@@ -2172,62 +2161,40 @@
       div.scrollIntoView({ behavior: 'smooth' });
     }
 
-    function appendAssistantMessage(data) {
-      const list = document.getElementById('messagesList');
-      const div = document.createElement('div');
-      div.className = 'message assistant';
+    
+    function appendAssistantMessage(text, stats, telemetry, modeLabel) {
+        const list = document.getElementById('messagesList');
+        const div = document.createElement('div');
+        div.className = 'message assistant';
+        const parsedMarkdown = renderVyomMarkdown(text);
+        
+        let footerHtml = '';
+        if (stats) {
+            const steps = telemetry && telemetry.steps_executed ? telemetry.steps_executed : 0;
+            const ms = stats.total_ms ? stats.total_ms.toFixed(1) : 0;
+            const source = stats.condition || modeLabel || "Flash";
+            footerHtml = `<div style="font-size: 0.7rem; color: var(--text-dim); text-align: right; margin-top: 4px;">${source} • ${steps} steps • ${ms} ms</div>`;
+        }
 
-      const parsedMarkdown = renderVyomMarkdown(data.response);
-      const thoughtTrace = data.thought_process || "Processed cognitive states through dynamic recurrent graph workspace.";
-      const seconds = (data.latency_ms / 1000).toFixed(2);
-      const modeLabel = data.model_mode ? data.model_mode.toUpperCase() : 'FLASH';
-
-      div.innerHTML = `
-        <div class="avatar vyom-av"><img src="/vyom_logo.png" alt="VYOM" class="avatar-logo-img"></div>
-        <div class="message-content-wrapper">
-          <!-- Thought Accordion -->
-          <div class="thought-container">
-            <div class="thought-header" onclick="toggleThought(this)">
-              <div class="thought-header-left">
-                <span>💭 Thought for ${seconds}s • ${data.recurrent_steps} recurrent steps • ${modeLabel}</span>
-              </div>
-              <svg class="thought-arrow" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="transition:transform 0.2s;"><path d="M7 10l5 5 5-5z"/></svg>
+        div.innerHTML = `
+          <div class="avatar vyom-av"><img src="/vyom_logo.png" alt="VYOM" class="avatar-logo-img"></div>
+          <div class="message-content-wrapper">
+            <div class="msg-body">${parsedMarkdown}</div>
+            ${footerHtml}
+            <!-- Action Bar -->
+            <div class="msg-actions">
+              <button class="action-icon-btn" onclick="speakText(\`${text.replace(/[`\\']/g, '')}\`, this)" title="Read aloud">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <span>Listen</span>
+              </button>
             </div>
-            <div class="thought-content">${thoughtTrace}</div>
           </div>
-
-          <!-- Formatted Content -->
-          <div class="msg-body">${parsedMarkdown}</div>
-
-          <!-- Action Bar -->
-          <div class="msg-actions">
-            <!-- Voice Audio Button -->
-            <button class="action-icon-btn" onclick="speakText(\`${data.response.replace(/[`\\]/g, '')}\`, this)" title="Read aloud (Voice Audio)">
-              <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-              <span>Listen</span>
-            </button>
-            <button class="action-icon-btn" onclick="copyFullMessage(this)" title="Copy text">
-              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-              <span>Copy</span>
-            </button>
-            <button class="action-icon-btn" onclick="this.style.color='#4ade80'" title="Good response">
-              <svg viewBox="0 0 24 24"><path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>
-            </button>
-            <button class="action-icon-btn" onclick="this.style.color='#f87171'" title="Bad response">
-              <svg viewBox="0 0 24 24"><path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z"/></svg>
-            </button>
-            <button class="action-icon-btn" onclick="sendPrompt('${data.prompt}')" title="Regenerate">
-              <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-            </button>
-            <span class="meta-badge">${data.condition} • ${data.num_nodes} Slots • ${data.latency_ms} ms</span>
-          </div>
-        </div>
-      `;
-      list.appendChild(div);
-      div.scrollIntoView({ behavior: 'smooth' });
+        `;
+        list.appendChild(div);
+        list.scrollTop = list.scrollHeight;
     }
 
-    function copyFullMessage(btn) {
+function copyFullMessage(btn) {
       const msgBody = btn.closest('.message-content-wrapper').querySelector('.msg-body');
       navigator.clipboard.writeText(msgBody.innerText).then(() => {
         btn.style.color = '#4ade80';
