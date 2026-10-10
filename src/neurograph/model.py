@@ -10,6 +10,7 @@ Integrates:
    legacy virtual-prefix adapter (`workspace.adapter_mode = "prefix"`).
 """
 
+import os
 from typing import Optional, Dict, Any
 import math
 import torch
@@ -280,6 +281,13 @@ class NeuroGraphModel(nn.Module):
                 from transformers import AutoModelForCausalLM
                 self.base_lm = AutoModelForCausalLM.from_pretrained(config.lm.model_name_or_path)
                 self.lm_backend = "huggingface"
+                if os.environ.get("VYOM_INT8_QUANT", "1") == "1" and not config.lm.use_lora:
+                    try:
+                        self.base_lm = torch.quantization.quantize_dynamic(
+                            self.base_lm, {torch.nn.Linear}, dtype=torch.qint8
+                        )
+                    except Exception:
+                        pass
             except Exception as exc:
                 # Fallback keeps tests/offline use working, but is recorded and surfaced
                 # via `lm_backend` / `lm_load_error` instead of failing silently.
