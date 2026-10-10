@@ -1,90 +1,148 @@
-# NeuroGraph-LLM Architecture Specification
+# Vyom Architecture
 
-## 1. System Overview
-
-NeuroGraph-LLM is an experimental brain-inspired cognitive architecture that integrates a causal pretrained Large Language Model (LLM) with a recurrent, dynamic graph-based cognitive workspace, persistent episodic memory, a world-state predictor, and a bounded goal-directed planner.
+This document describes what the code in `src/neurograph/` actually does. Where a component
+is experimental or has not been shown to help, that is stated explicitly.
 
 ```mermaid
-flowchart TD
-    Input["Input Prompt / Environment Observation"] --> Tokenizer["Tokenization & Contextual Encoding"]
-    Tokenizer --> Workspace["Dynamic Cognitive Workspace Slots M(t)"]
-    
-    subgraph Recurrence["Recurrent Graph Workspace (t = 1 .. T)"]
-        Workspace --> DynConn["Dynamic Graph Connectivity G(t)"]
-        DynConn --> MsgPass["Relational Message Passing"]
-        MsgPass --> CrossAttn["Context Cross-Attention to Language Tokens H"]
-        CrossAttn --> GatedUpdate["Gated Recurrent State Transition (GRU)"]
-        GatedUpdate --> Residual["Residual Connection + LayerNorm"]
-        Residual --> Workspace
-    end
-
-    Residual --> Adapter["Graph-to-Language Adapter (Virtual Prefix Projection)"]
-    Residual --> ActionHead["Action Selection Head"]
-    
-    subgraph Subsystems["Episodic Store & World Dynamics"]
-        EpisodicMem[("Persistent Episodic Memory\n(Key-Value, Provenance, Conflict-Safe)")]
-        WorldModel["World-State Predictor\n(Next State & Epistemic Uncertainty)"]
-        Planner["Goal-Directed Planner\n(Model-based Rollouts & BFS Baseline)"]
-    end
-
-    Adapter --> CausalLM["Causal Language Model (Autoregressive Generation)"]
-    CausalLM --> Output["Generated Response & Next Actions"]
+flowchart LR
+    U["Browser UI (index.html)"] -->|SSE /api/chat/stream| S["FastAPI server (server.py)"]
+    S --> E["ChatEngine (engine.py)"]
+    S --> M[("MemoryStore SQLite (memory_store.py)")]
+    S --> P["WorldModelSearchPlanner (planner.py)"]
+    E --> G["CognitiveGenerator (generation.py)"]
+    G --> N["NeuroGraphModel (model.py)"]
+    N --> LM["Base causal LM (DialoGPT-small by default)"]
+    N --> W["DynamicCognitiveWorkspace (cognitive_workspace.py)"]
+    W --> A["GatedCrossAttentionAdapter"]
+    A --> LM
+    P --> WM["WorldStatePredictor (world_model.py)"]
 ```
 
----
+Model weights, inference configuration, cognitive state, and user memory are separate:
 
-## 2. Mathematical Formalization & Distinctions from Standard Attention
+| Component | Where it lives | Persisted? |
+| :--- | :--- | :--- |
+| Base LM weights | Hugging Face cache (read-only, offline by default) | yes (HF cache) |
+| Workspace / adapter weights | `NeuroGraphModel`; optional checkpoint via `VYOM_CHECKPOINT` | only if you save one |
+| Inference config | request parameters + `MODES` in `engine.py` + env vars | no |
+| Cognitive state (workspace nodes) | computed per request, discarded after the reply | no |
+| User memory | `data/vyom.db` (SQLite), per user | yes, only on explicit save |
+| World model | `models/world_model_gridworld.pt` (36k params) | yes |
 
-### 2.1 Standard Self-Attention vs. NeuroGraph Cognitive Workspace
+## 1. Dynamic graph workspace
 
-In a conventional Transformer, self-attention performs a stateless, one-pass all-to-all mapping:
-$$\text{Attention}(Q, K, V) = \text{Softmax}\left(\frac{Q K^T}{\sqrt{d_k}}\right) V$$
-where every token sequence element interacts simultaneously without topological sparsity, state retention, or discrete multi-step reasoning transitions.
+`DynamicCognitiveWorkspace` holds `N` learned slot vectors `M(0)` (default 8 × 64). For
+`t = 1..T`:
 
-In **NeuroGraph-LLM**:
-1. **Persistent Workspace Slots**: The architecture maintains a discrete set of $N$ cognitive workspace slots $M(t) \in \mathbb{R}^{B \times N \times D_{\text{node}}}$, initialized from learned priors and modulated by contextual task features.
-2. **Dynamic / Sparse Graph Topology $G(t)$**:
-   $$S_{ij}(t) = \frac{(M_i(t) W_Q)(M_j(t) W_K)^T}{\sqrt{d_k}}$$
-   When top-$k$ sparsification is enabled:
-   $$A_{ij}(t) = \text{Softmax}\left( \text{TopK-Mask}(S_{ij}(t), k) \right)$$
-   where $\sum_{j} A_{ij}(t) = 1.0$.
-3. **Recurrent Gated Message Passing**:
-   For recurrence steps $t = 1, \dots, T$:
-   $$\text{Msg}_i(t) = \sum_{j} A_{ij}(t) (M_j(t) W_V)$$
-   $$\text{Ctx}_i(t) = \text{CrossAttention}(M_i(t), H)$$
-   $$\text{Incoming}_i(t) = \left[ \text{Msg}_i(t) \,\|\, \text{Ctx}_i(t) \,\|\, W_g g \,\|\, W_u u \right]$$
-   $$M_i(t+1) = \text{LayerNorm}\left( M_i(t) + \text{GRUCell}(M_i(t), \text{Incoming}_i(t)) \right)$$
-   This guarantees temporal stability, bounded activations, and non-trivial recurrent information routing across slots.
+1. **Read**: slots cross-attend to the context features `H` (with padding mask).
+2. **Input-dependent connectivity**: `G(t) = softmax(q(M) k(M)^T / sqrt(d))`, optionally
+   sparsified to top-k edges per node (`top_k_edges`). With `dynamic_connectivity=False`
+   (Condition D) a learned static adjacency is used instead.
+3. **Message passing**: multi-head aggregation of neighbour messages weighted by `G(t)`.
+4. **Gated recurrent update**: GRU-style gate `M(t+1) = (1-z)·M(t) + z·h̃`, followed by a
+   residual connection and LayerNorm.
+5. **Adaptive halting** (optional, `halt_threshold`): per sample, once
+   `||M(t+1)-M(t)|| / ||M(t)||` falls below the threshold (after `min_steps`), that sample's
+   state is frozen while others continue. The number of executed steps is returned.
 
----
+**Context features.** With `context_source="hidden"` (default) `H` is the base LM's final
+hidden states over the prompt — contextual and order-aware. The legacy `"embeddings"` option
+read raw token embeddings, which carry no positional information.
 
-## 3. Subsystem Modules
+### How this differs from ordinary Transformer attention
 
-### Module A: Base Language Model
-- Causal decoder architecture with token embeddings, positional encodings, masked causal multi-head self-attention, and language model head.
-- Base weights are frozen by default to preserve pretrained capabilities.
-- Native lightweight LoRA (`LoRALinear`) adapter enabled for parameter-efficient adaptation without requiring third-party library overhead.
+| | Transformer self-attention | Vyom workspace |
+| :--- | :--- | :--- |
+| What attends | every token to every earlier token | a small, fixed set of `N` latent slots |
+| State across iterations | none inside a layer; depth is fixed by layer count | slots are carried across `T` recurrent steps with a GRU gate (weights shared across steps) |
+| Graph | implicit, token × token, recomputed per layer | explicit `N × N` adjacency over slots, inspectable per step, optionally sparse or static |
+| Compute | fixed per token | `O(T·N²)` extra per prompt, independent of reply length; `T` can adapt per sample |
+| Coupling to the LM | is the LM | reads LM hidden states; writes back through a gated adapter |
 
-### Module B & C: Dynamic Cognitive Workspace & Recurrent Updater
-- Configurable node slots ($N$), recurrent steps ($T$), and hidden dimension ($D$).
-- Multi-head message passing aggregating relational information across slots.
-- Explicit interfaces for goal vectors $g \in \mathbb{R}^{D_{\text{goal}}}$ and epistemic uncertainty $u \in \mathbb{R}^{D_{\text{unc}}}$.
-- Row-normalized directed adjacency preventing activation explosion.
+Mathematically the workspace is a recurrent, weight-tied attention module over latent slots
+(related to Perceiver-style latents and Slot Attention). It is not a model of biological
+cognition.
 
-### Module D: Persistent Episodic Memory
-- Operates independently from transient workspace slots.
-- Stores explicit memory records with structured content, task context, timestamps, episode indices, and source provenance.
-- Conflict preservation: updating existing keys preserves full historical provenance and explicit confidence tracking rather than silently overwriting records.
-- Differentiable cosine similarity retrieval and local JSON persistence.
+## 2. Interface to the language model (why it is "integrated")
 
-### Module E: World-State Predictor
-- Encodes state $s_t$ and action $a_t$ through dedicated encoders.
-- Predicts next-state delta $s_{t+1}$ and aleatoric/epistemic uncertainty $\sigma_t = \exp(0.5 \log \sigma^2)$ using Gaussian Negative Log-Likelihood (NLL).
+`GatedCrossAttentionAdapter` (default, `adapter_mode="gated_cross"`):
 
-### Module F: Goal-Directed Planner
-- Closed-loop model-based rollout planning: simulates future candidate trajectories using the world model, scoring actions by goal heuristic and penalizing predictive uncertainty.
-- Integrates conventional search baselines (Breadth-First Search and A*) for rigorous benchmarking against optimal combinatorial solvers.
+```
+e_i' = e_i + tanh(g) · W_o · Attn(q = W_q·LN(e_i), K, V = W_k,v · P(M_T))
+```
 
-### Module G: Graph-to-Language Adapter
-- Projects workspace representations into virtual prefix prompt embeddings $[P_1, \dots, P_K]$ prepended to sequence inputs.
-- Causal attention strictly preserves left-to-right causal masking: future tokens cannot leak into earlier positions, and prefix tokens condition all autoregressive language decoding.
+applied to **every** input embedding — prompt tokens and each generated token — before the
+LM. Properties (all covered by tests):
+
+* `g` is initialised to 0, so a freshly added workspace is an *exact identity*: Condition C
+  produces byte-identical text to Condition A (`tests/test_gradients.py`). The previous
+  prefix adapter, untrained, raised DialoGPT perplexity from ~121 to ~2,800 (see
+  `docs/BENCHMARKS.md`).
+* The gate still receives gradient at init, so training can open it.
+* No sequence-length change and no position shift, so it composes with the KV cache: each
+  new token is injected independently against the fixed final nodes.
+
+**Honesty note.** The shipped chat model has no trained workspace checkpoint, so the gate is 0
+and the workspace does *not* change chat replies. The UI and `/api/status` say so. The
+workspace telemetry (adjacency, step deltas, steps executed) is still real computation.
+
+The legacy prefix adapter is kept behind `adapter_mode="prefix"` for ablations.
+
+## 3. Generation
+
+`CognitiveGenerator.stream()`:
+
+* runs the workspace once over the prompt;
+* decodes with a KV cache on Hugging Face backends (measured ~2.3× faster than recompute
+  at 48–64 tokens, identical tokens);
+* supports greedy / temperature / top-k / top-p sampling and repetition penalty;
+* stops on tokenizer EOS, `max_new_tokens`, a wall-clock budget (`VYOM_MAX_TIME_S`, default
+  2 s), the model's context limit, or a cancellation `threading.Event`;
+* records measured timings and the stop reason in `last_stats`.
+
+`ChatEngine` formats history with the tokenizer's chat template (DialoGPT's template joins
+turns with EOS), truncates to the last 6 turns / 256 prompt tokens, retrieves memories, and
+emits SSE events. Replies are labelled by `source`: `model`, `curated` (a short list of
+accurate self-descriptions the small base model cannot produce), or `image_metadata`.
+
+### Modes
+
+| Mode | Computation |
+| :--- | :--- |
+| Fast | Condition A: base LM only |
+| Cognitive | Condition C: workspace, 3 fixed steps |
+| Adaptive | Condition C with halting at 5% relative change, max 6 steps |
+
+## 4. Persistent memory (`memory_store.py`)
+
+* Created only by explicit user action; conversations are never stored automatically.
+* Per-user isolation on every query; optional bearer-token auth maps tokens to users.
+* Provenance (`source`, `conversation_id`), `created_at`, `updated_at`, `version`.
+* Conflicts: same `key` ⇒ the old record is superseded (kept, versioned); un-keyed records
+  with cosine ≥ 0.85 to an existing one are flagged `possible_conflict_with`.
+* Inspect / edit / delete / wipe / disable via API and UI. Disabled ⇒ nothing retrieved.
+* Embeddings: all-MiniLM-L6-v2 from the local HF cache if present, else a hashed
+  bag-of-words fallback. Retrieved memories (score ≥ 0.35, top 3) are prepended to the
+  prompt and listed in the reply's metadata.
+
+`memory.py` (`EpisodicMemory`) is the older vector-level research store used inside
+`NeuroGraphModel`; it is not used for user memory.
+
+## 5. World model and planning
+
+* `world_model_training.py` collects real GridWorld transitions (random walks on map seeds
+  0–199) and trains `WorldStatePredictor` (residual MLP with a Gaussian NLL head). Evaluation
+  is on unseen maps 1000–1099 and includes a "copy current state" baseline.
+* `WorldModelSearchPlanner` plans by breadth-first search over transitions *imagined* by the
+  world model, decoding predicted positions from the state vector. It executes one action,
+  observes the real outcome, remembers blocked moves and observed cells, and replans. It
+  never reads the obstacle map; it only sees position, goal and four local wall sensors.
+* `/api/plan` reports `planner_used` and shows a BFS oracle separately. The previous server
+  silently replaced failed model plans with A*; that fallback was removed.
+
+## 6. Recurrent reasoning state and limits
+
+The workspace state is recomputed per prompt and discarded; nothing leaks between requests or
+users. Whether more recurrent steps improve multi-step tasks is measured in
+`benchmarks/run_all.py` (`reasoning`, `adaptive`) — see `docs/BENCHMARKS.md` for the actual
+results, including negative ones.

@@ -21,10 +21,10 @@
       --vyom-gold-light: #fbf0d3;
       --vyom-gold-dark: #b89047;
       --vyom-gold-glow: rgba(230, 200, 135, 0.35);
-      --gemini-blue: #e6c887;
-      --gemini-purple: #c99e52;
-      --gemini-pink: #fbf0d3;
-      --gemini-gradient: linear-gradient(135deg, #fbf0d3 0%, #e6c887 35%, #c99e52 70%, #9e742e 100%);
+      --vyom-blue: #e6c887;
+      --vyom-purple: #c99e52;
+      --vyom-pink: #fbf0d3;
+      --vyom-gradient: linear-gradient(135deg, #fbf0d3 0%, #e6c887 35%, #c99e52 70%, #9e742e 100%);
       --font-family: -apple-system, BlinkMacSystemFont, "Google Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
@@ -118,7 +118,7 @@
       font-size: 1.15rem;
       font-weight: 800;
       letter-spacing: 2.5px;
-      background: var(--gemini-gradient);
+      background: var(--vyom-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -135,7 +135,7 @@
     .sparkle-icon {
       width: 28px;
       height: 28px;
-      background: var(--gemini-gradient);
+      background: var(--vyom-gradient);
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -336,7 +336,7 @@
     .model-selector:hover { background-color: #2b2c2f; }
     .model-selector span.badge {
       font-size: 0.72rem;
-      color: var(--gemini-blue);
+      color: var(--vyom-blue);
       font-weight: 600;
       background: rgba(71, 150, 230, 0.15);
       padding: 2px 8px;
@@ -407,7 +407,7 @@
       transition: all 0.2s;
     }
     .live-voice-btn:hover {
-      background: var(--gemini-gradient);
+      background: var(--vyom-gradient);
       border-color: transparent;
       box-shadow: 0 0 12px rgba(155, 114, 203, 0.4);
     }
@@ -503,7 +503,7 @@
       font-size: 3.4rem;
       font-weight: 800;
       letter-spacing: 8px;
-      background: var(--gemini-gradient);
+      background: var(--vyom-gradient);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       margin-bottom: 6px;
@@ -602,7 +602,7 @@
       font-weight: 600;
     }
     .avatar.user-av { background: #4f46e5; color: #fff; font-size: 0.9rem; }
-    .avatar.vyom-av, .avatar.gemini-av {
+    .avatar.vyom-av, .avatar.vyom-av2 {
       background: #0a0d14;
       border: 1.5px solid var(--vyom-gold);
       box-shadow: 0 0 10px var(--vyom-gold-glow);
@@ -711,7 +711,7 @@
       color: #e5c07b;
     }
     .msg-body blockquote {
-      border-left: 3px solid var(--gemini-purple);
+      border-left: 3px solid var(--vyom-purple);
       padding: 6px 14px;
       margin: 12px 0;
       background-color: rgba(155, 114, 203, 0.08);
@@ -800,7 +800,7 @@
       transition: all 0.15s;
     }
     .action-icon-btn:hover { background-color: #282a2c; color: var(--text-main); }
-    .action-icon-btn.active { color: var(--gemini-blue); }
+    .action-icon-btn.active { color: var(--vyom-blue); }
     .action-icon-btn svg { width: 14px; height: 14px; fill: currentColor; }
     .meta-badge {
       margin-left: auto;
@@ -910,7 +910,7 @@
     .voice-bar {
       width: 4px;
       height: 6px;
-      background: var(--gemini-gradient);
+      background: var(--vyom-gradient);
       border-radius: 3px;
       transition: height 0.05s ease;
     }
@@ -998,7 +998,7 @@
       flex-shrink: 0;
     }
     .send-btn.active {
-      background: var(--gemini-gradient);
+      background: var(--vyom-gradient);
       color: #fff;
       box-shadow: 0 0 12px rgba(155, 114, 203, 0.4);
     }
@@ -1009,7 +1009,7 @@
       text-align: center;
     }
 
-    /* Live Voice Modal (Gemini Live Mode) */
+    /* Live Voice Modal (Vyom Live Mode) */
     .live-voice-modal {
       position: fixed;
       top: 0;
@@ -1533,7 +1533,7 @@
     <div class="live-modal-header">
       <div class="live-modal-title">
         <img src="/vyom_logo.png" alt="VYOM" class="vyom-brand-logo">
-        <span style="font-weight:700; letter-spacing:1px; background:var(--gemini-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">VYOM Live Voice</span>
+        <span style="font-weight:700; letter-spacing:1px; background:var(--vyom-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">VYOM Live Voice</span>
       </div>
       <button class="live-close-btn" onclick="closeLiveVoiceModal()" title="Close Live Voice">✕</button>
     </div>
@@ -1994,7 +1994,7 @@
     }
 
     // Markdown Parser
-    function renderGeminiMarkdown(text) {
+    function renderVyomMarkdown(text) {
       if (!text) return '';
 
       let html = text
@@ -2177,7 +2177,7 @@
       const div = document.createElement('div');
       div.className = 'message assistant';
 
-      const parsedMarkdown = renderGeminiMarkdown(data.response);
+      const parsedMarkdown = renderVyomMarkdown(data.response);
       const thoughtTrace = data.thought_process || "Processed cognitive states through dynamic recurrent graph workspace.";
       const seconds = (data.latency_ms / 1000).toFixed(2);
       const modeLabel = data.model_mode ? data.model_mode.toUpperCase() : 'FLASH';

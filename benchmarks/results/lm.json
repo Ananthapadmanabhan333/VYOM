@@ -1,0 +1,75 @@
+{
+  "benchmark": "lm",
+  "env": {
+    "python": "3.11.9",
+    "torch": "2.12.1+cpu",
+    "transformers": "4.57.1",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "cpu_count": 16,
+    "threads": 8,
+    "ram_gb": 16.4,
+    "cuda": false,
+    "timestamp": "2026-10-10T17:55:10"
+  },
+  "ppl_data": "imdb test split, 200 random reviews (seed 0), first 128 tokens",
+  "model_load_seconds": 3.26,
+  "rss_after_load_mb": 1007.2,
+  "rss_model_delta_mb": 538.6,
+  "perplexity": {
+    "A_base": 13860.2,
+    "C_gated_gate0": 13860.2,
+    "C_legacy_prefix_untrained": 12905.54
+  },
+  "chat_latency": {
+    "prompts": 10,
+    "max_new_tokens": 64,
+    "greedy": true,
+    "time_budget_s": 2.0,
+    "modes": {
+      "fast": {
+        "total_ms_median": 2021.4,
+        "total_ms_max": 2033.0,
+        "first_token_ms_median": 58.7,
+        "tokens_per_s_median": 27.96,
+        "new_tokens_mean": 56.4,
+        "stop_reasons": {
+          "max_time": 10
+        },
+        "workspace_steps_mean": 0,
+        "within_2s": 0.0
+      },
+      "cognitive": {
+        "total_ms_median": 2027.3,
+        "total_ms_max": 2034.2,
+        "first_token_ms_median": 120.9,
+        "tokens_per_s_median": 27.37,
+        "new_tokens_mean": 53.5,
+        "stop_reasons": {
+          "max_time": 10
+        },
+        "workspace_steps_mean": 3,
+        "within_2s": 0.0
+      },
+      "adaptive": {
+        "total_ms_median": 2007.8,
+        "total_ms_max": 2035.3,
+        "first_token_ms_median": 126.1,
+        "tokens_per_s_median": 27.19,
+        "new_tokens_mean": 52.9,
+        "stop_reasons": {
+          "max_time": 10
+        },
+        "workspace_steps_mean": 6,
+        "within_2s": 0.0
+      }
+    }
+  },
+  "kv_cache": {
+    "tokens": 64,
+    "kv_cache_s": 2.228,
+    "full_recompute_s": 5.861,
+    "speedup": 2.63,
+    "identical_tokens": true
+  },
+  "peak_rss_mb": 1289.5
+}

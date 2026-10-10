@@ -1,0 +1,33 @@
+{
+  "benchmark": "memory",
+  "env": {
+    "python": "3.11.9",
+    "torch": "2.12.1+cpu",
+    "transformers": "4.57.1",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "cpu_count": 16,
+    "threads": 8,
+    "ram_gb": 16.4,
+    "cuda": false,
+    "timestamp": "2026-10-10T17:51:55"
+  },
+  "n_facts": 30,
+  "queries": "paraphrased questions (hand-written, see run_all.py)",
+  "chance_top1": 0.0333,
+  "results": {
+    "hashed_bow": {
+      "embedder": "hashed-bow-512",
+      "top1_accuracy": 0.3,
+      "top3_accuracy": 0.5,
+      "ms_per_query": 0.22,
+      "cross_user_leak": false
+    },
+    "minilm": {
+      "embedder": "all-MiniLM-L6-v2",
+      "top1_accuracy": 0.9667,
+      "top3_accuracy": 1.0,
+      "ms_per_query": 6.32,
+      "cross_user_leak": false
+    }
+  }
+}

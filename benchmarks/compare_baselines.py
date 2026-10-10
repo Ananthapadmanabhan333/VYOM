@@ -18,6 +18,7 @@ def evaluate_bfs_baseline(num_episodes: int = 10, seed: int = 500, max_steps: in
     planner = SearchBasedPlanner(GridWorld.ACTION_MAP)
     successes = 0
     total_steps = 0
+    plan_ms = []
 
     for ep in range(num_episodes):
         env = GridWorld.generate_random_map(
@@ -30,7 +31,9 @@ def evaluate_bfs_baseline(num_episodes: int = 10, seed: int = 500, max_steps: in
         start = info["pos"]
         goal = info["goal"]
 
+        t0 = time.perf_counter()
         path = planner.plan_bfs(start, goal, is_valid_fn=env.is_valid_coord, max_depth=max_steps)
+        plan_ms.append((time.perf_counter() - t0) * 1000.0)
         if path:
             # Execute path in environment
             ep_success = False
@@ -51,7 +54,7 @@ def evaluate_bfs_baseline(num_episodes: int = 10, seed: int = 500, max_steps: in
         "avg_steps_to_goal": total_steps / max(1, num_episodes),
         "final_total_loss": 0.0,
         "total_parameters": 0,
-        "avg_latency_ms": 0.15,
+        "avg_latency_ms": round(sum(plan_ms) / max(1, len(plan_ms)), 4),  # measured
     }
 
 

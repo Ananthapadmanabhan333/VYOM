@@ -1,0 +1,99 @@
+{
+  "benchmark": "planning",
+  "env": {
+    "python": "3.11.9",
+    "torch": "2.12.1+cpu",
+    "transformers": "4.57.1",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "cpu_count": 16,
+    "threads": 8,
+    "ram_gb": 16.4,
+    "cuda": false,
+    "timestamp": "2026-10-10T17:51:48"
+  },
+  "maps": [
+    1000,
+    1199
+  ],
+  "max_steps": 30,
+  "world_model_trained_on_density": 0.2,
+  "results": {
+    "density_0.2": {
+      "maps_without_obstacles_fallback": 0,
+      "bfs_oracle_full_map": {
+        "success_rate": 1.0,
+        "mean_steps_when_successful": 10,
+        "latency_ms_mean": 0.033,
+        "latency_ms_p95": 0.035,
+        "online_prediction_accuracy": null
+      },
+      "greedy_manhattan_local_sensors": {
+        "success_rate": 0.92,
+        "mean_steps_when_successful": 12.04,
+        "latency_ms_mean": 0.56,
+        "latency_ms_p95": 1.158,
+        "online_prediction_accuracy": null
+      },
+      "legacy_rollout_planner_trained_wm": {
+        "success_rate": 0.0,
+        "mean_steps_when_successful": null,
+        "latency_ms_mean": 165.662,
+        "latency_ms_p95": 191.152,
+        "online_prediction_accuracy": null
+      },
+      "world_model_search_untrained_wm": {
+        "success_rate": 0.0,
+        "mean_steps_when_successful": null,
+        "latency_ms_mean": 96.552,
+        "latency_ms_p95": 118.747,
+        "online_prediction_accuracy": 0.0053
+      },
+      "world_model_search_trained_wm": {
+        "success_rate": 0.965,
+        "mean_steps_when_successful": 12.65,
+        "latency_ms_mean": 35.384,
+        "latency_ms_p95": 78.61,
+        "online_prediction_accuracy": 1.0
+      }
+    },
+    "density_0.35": {
+      "maps_without_obstacles_fallback": 0,
+      "bfs_oracle_full_map": {
+        "success_rate": 1.0,
+        "mean_steps_when_successful": 10.12,
+        "latency_ms_mean": 0.031,
+        "latency_ms_p95": 0.044,
+        "online_prediction_accuracy": null
+      },
+      "greedy_manhattan_local_sensors": {
+        "success_rate": 0.715,
+        "mean_steps_when_successful": 12.92,
+        "latency_ms_mean": 0.98,
+        "latency_ms_p95": 1.801,
+        "online_prediction_accuracy": null
+      },
+      "legacy_rollout_planner_trained_wm": {
+        "success_rate": 0.0,
+        "mean_steps_when_successful": null,
+        "latency_ms_mean": 154.287,
+        "latency_ms_p95": 193.946,
+        "online_prediction_accuracy": null
+      },
+      "world_model_search_untrained_wm": {
+        "success_rate": 0.0,
+        "mean_steps_when_successful": null,
+        "latency_ms_mean": 91.749,
+        "latency_ms_p95": 116.166,
+        "online_prediction_accuracy": 0.0093
+      },
+      "world_model_search_trained_wm": {
+        "success_rate": 0.92,
+        "mean_steps_when_successful": 13.18,
+        "latency_ms_mean": 38.639,
+        "latency_ms_p95": 89.672,
+        "online_prediction_accuracy": 1.0
+      }
+    }
+  },
+  "notes": "BFS reads the obstacle map (oracle). All other planners observe only the state vector (position, goal, 4 local wall sensors)."
+}

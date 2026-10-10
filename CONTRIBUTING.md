@@ -1,29 +1,45 @@
-# Contributing to NeuroGraph-LLM
+# Contributing to Vyom
 
-We welcome contributions to the NeuroGraph-LLM research prototype! Please review our contribution guidelines before submitting code.
+Thanks for helping. Vyom is a research platform: honest, reproducible results matter more
+than impressive ones.
 
-## Development Workflow
+## Setup
 
-1. Fork and clone the repository.
-2. Ensure you have Python 3.10+ (preferably Python 3.11).
-3. Install dependencies:
-   ```bash
-   pip install -e ".[dev]"
-   ```
-4. Run the test suite:
-   ```bash
-   pytest -q
-   ```
+```bash
+python -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # or your CUDA build
+pip install -e ".[dev]"
+# exact versions used for the published results: requirements.lock.txt
+```
 
-## Code Quality Standards
+Run from the repository root with `PYTHONPATH=src:.` (Windows PowerShell:
+`$env:PYTHONPATH="src;."`) — the `environments/` package lives at the root.
 
-- Maintain complete type hints and docstrings.
-- Code style: adhere to standard Python formatting (ruff / black compatible).
-- All new architectural modules must include dedicated unit tests in `tests/`.
-- No large model weights or binary blobs should be committed to the repository.
-- Avoid external proprietary API dependencies.
+## Before opening a pull request
 
-## Scientific Rigor
+```bash
+ruff check src tests benchmarks environments examples
+pytest -q
+```
 
-- Negative results are first-class contributions. If an architectural variation underperforms, report the configuration and empirical findings without exaggeration.
-- Claims must be supported by reproducible experiments and executed benchmark logs.
+* Add tests for new behaviour (`tests/`). Tests must run offline with the `mock` backend; they
+  must never download weights.
+* Keep model weights out of git (except tiny, reproducible artefacts such as
+  `models/world_model_gridworld.pt`, which `benchmarks/run_all.py` regenerates).
+* No proprietary API dependencies; everything must run locally.
+
+## Rules for claims and UI
+
+* Never fabricate outputs. The UI may only display model text, measured telemetry, or content
+  labelled with its source (`curated`, `image_metadata`).
+* Any number in the docs must come from `benchmarks/run_all.py` (or another committed script)
+  with its raw JSON in `benchmarks/results/`. Record seeds, configs, and failures.
+* Negative results are welcome and should be reported as such.
+* Do not describe the system as AGI, conscious, or a simulation of the brain.
+
+## Benchmarks
+
+```bash
+python benchmarks/run_all.py --quick            # smoke (minutes)
+python benchmarks/run_all.py                    # full (see docs/BENCHMARKS.md for runtime)
+```

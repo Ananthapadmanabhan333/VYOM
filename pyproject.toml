@@ -3,14 +3,14 @@ requires = ["setuptools>=65.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "neurograph-llm"
-version = "0.1.0"
-description = "Brain-inspired cognitive architecture integrating Large Language Models with a recurrent dynamic graph cognitive workspace."
+name = "vyom"
+version = "2.0.0"
+description = "Vyom - Toward Machine Cognition: an open-source research platform combining a local language model with a recurrent dynamic graph workspace, user-controlled memory and model-based planning."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "NeuroGraph-LLM Research Team"}
+    {name = "Vyom contributors"}
 ]
 keywords = ["cognitive-architecture", "large-language-models", "graph-neural-networks", "recurrent-memory", "planning"]
 classifiers = [
@@ -21,19 +21,31 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: Apache Software License",
 ]
+# Lower bounds are the oldest versions we expect to work; the exact versions used for
+# the published tests and benchmarks are pinned in requirements.lock.txt.
 dependencies = [
-    "torch>=2.0.0",
-    "transformers>=4.30.0",
-    "numpy>=1.24.0",
+    "torch>=2.1",
+    "transformers>=4.40",
+    "numpy>=1.24,<3",
     "pyyaml>=6.0",
-    "tqdm>=4.65.0",
+    "tqdm>=4.65",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.5",
+    "pillow>=10.0",
+    "psutil>=5.9",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0.0",
-    "ruff>=0.1.0",
-    "scipy>=1.10.0",
+    "pytest>=7.0",
+    "httpx>=0.27",
+    "ruff>=0.5",
+]
+bench = [
+    "datasets>=2.18",
+]
+lora = [
     "peft>=0.4.0",
 ]
 
@@ -49,8 +61,10 @@ filterwarnings = [
 ]
 
 [tool.ruff]
-line-length = 100
-target-version = "py311"
+line-length = 150
+target-version = "py310"
 
 [tool.ruff.lint]
-per-file-ignores = { "examples/*" = ["E402"] }
+select = ["E", "F", "W"]
+ignore = ["E731"]
+per-file-ignores = { "examples/*" = ["E402"], "benchmarks/*" = ["E402"] }

@@ -45,3 +45,7 @@ experiments_output/
 wandb/
 runs/
 .cache/
+
+# Local user data (memory database) - never commit
+data/
+.ruff_cache/

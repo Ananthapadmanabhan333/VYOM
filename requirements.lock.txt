@@ -1,0 +1,18 @@
+# Exact versions used for the v2.0.0 tests and benchmarks (Windows-10-10.0.26200-SP0, Python 3.11.9, CPU).
+torch==2.12.1
+transformers==4.57.1
+numpy==1.26.4
+pyyaml==6.0.3
+tqdm==4.68.2
+fastapi==0.138.1
+uvicorn==0.49.0
+pydantic==2.13.4
+pillow==10.0.0
+psutil==7.2.2
+pytest==7.4.2
+httpx==0.28.1
+datasets==5.0.0
+safetensors==0.8.0
+tokenizers==0.22.2
+huggingface-hub==0.36.2
+starlette==1.3.1
