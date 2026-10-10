@@ -6,7 +6,7 @@ its ``source`` (``model``, ``curated``, ``image_metadata``). Nothing is invented
 
 Environment variables
 ---------------------
-VYOM_MODEL            HF model id/path or ``mock`` (default ``HuggingFaceTB/SmolLM2-135M-Instruct``)
+VYOM_MODEL            HF model id/path or ``mock`` (default ``Qwen/Qwen2.5-0.5B-Instruct``)
 VYOM_CHECKPOINT       optional NeuroGraph checkpoint to load (only if fully compatible)
 VYOM_ALLOW_DOWNLOAD   ``1`` to allow Hugging Face downloads (default: offline only)
 VYOM_THREADS          torch CPU threads (default: min(8, cpu_count))
@@ -173,7 +173,7 @@ def fetch_wikipedia_context(query: str) -> str:
 class ChatEngine:
     def __init__(self, model_name: Optional[str] = None, checkpoint: Optional[str] = None):
         t0 = time.perf_counter()
-        self.model_name = model_name or os.environ.get("VYOM_MODEL", "HuggingFaceTB/SmolLM2-135M-Instruct")
+        self.model_name = model_name or os.environ.get("VYOM_MODEL", "Qwen/Qwen2.5-0.5B-Instruct")
         if os.environ.get("VYOM_ALLOW_DOWNLOAD", "0") != "1":
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
@@ -277,9 +277,9 @@ class ChatEngine:
         prefix_text = ""
         wiki_ctx = ""
         message_strip = req.message.strip()
-        is_question = message_strip.endswith('?') or any(message_strip.lower().startswith(w) for w in ['who ', 'what ', 'where ', 'when ', 'why ', 'how '])
+        #is_question = message_strip.endswith('?') or any(message_strip.lower().startswith(w) for w in ['who ', 'what ', 'where ', 'when ', 'why ', 'how '])
         curated_tmp = curated_answer(message_strip, self.model_name)
-        if is_question and not curated_tmp:
+        if len(message_strip.split()) > 2 and not curated_tmp:
             wiki_ctx = fetch_wikipedia_context(message_strip)
             if wiki_ctx:
                 sources.append("wikipedia")
