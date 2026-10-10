@@ -224,3 +224,112 @@ class ModelBasedRolloutPlanner:
             "trajectory": trajectory,
             "actions": actions_taken,
         }
+
+
+class WorldModelSearchPlanner:
+    """Closed-loop planner that searches over transitions *imagined* by the world model.
+
+    Each step: (1) breadth-first search from the real observed state, expanding every
+    candidate action through the learned ``WorldStatePredictor`` and decoding predicted
+    grid positions; (2) execute the first action of the best imagined path; (3) observe
+    the real outcome, record whether the prediction was right, remember transitions that
+    turned out to be blocked, and replan. The planner never reads the obstacle map; it
+    only sees state vectors (position, goal, local wall sensors).
+    """
+
+    def __init__(self, world_model: WorldStatePredictor, height: int, width: int,
+                 max_depth: int = 14, action_dim: int = 5):
+        self.wm = world_model
+        self.h, self.w = height, width
+        self.max_depth = max_depth
+        self.actions = [a for a in range(action_dim) if a != 4]  # STAY never helps reach a goal
+
+    def _pos(self, s: torch.Tensor) -> Tuple[int, int]:
+        r = round(float((s[0].item() + 1.0) / 2.0 * (self.h - 1)))
+        c = round(float((s[1].item() + 1.0) / 2.0 * (self.w - 1)))
+        return max(0, min(self.h - 1, r)), max(0, min(self.w - 1, c))
+
+    def _goal(self, s: torch.Tensor) -> Tuple[int, int]:
+        r = round(float((s[2].item() + 1.0) / 2.0 * (self.h - 1)))
+        c = round(float((s[3].item() + 1.0) / 2.0 * (self.w - 1)))
+        return r, c
+
+    @torch.no_grad()
+    def imagine_path(self, state: torch.Tensor, blocked: set, visits: Dict[Tuple[int, int], int],
+                     observed: Optional[Dict[Tuple[int, int], torch.Tensor]] = None) -> Tuple[List[int], int]:
+        """Return (action path, number of world-model calls)."""
+        self.wm.eval()
+        goal = self._goal(state)
+        start = self._pos(state)
+        frontier = [(state, start, [])]
+        seen = {start}
+        calls = 0
+        best: Tuple[float, List[int]] = (float("inf"), [])
+        for _depth in range(self.max_depth):
+            if not frontier:
+                break
+            states = torch.stack([f[0] for f in frontier for _ in self.actions])
+            acts = torch.tensor([a for _ in frontier for a in self.actions], dtype=torch.long)
+            preds, _ = self.wm(states, acts)
+            calls += len(acts)
+            nxt = []
+            for i, (s_f, p_f, path) in enumerate(frontier):
+                for j, a in enumerate(self.actions):
+                    pred = preds[i * len(self.actions) + j]
+                    p = self._pos(pred)
+                    if p == p_f or (p_f, a) in blocked or p in seen:
+                        continue
+                    new_path = path + [a]
+                    if p == goal:
+                        return new_path, calls
+                    seen.add(p)
+                    if observed is not None and p in observed:
+                        pred = observed[p]  # use what was really sensed there
+                    d = abs(p[0] - goal[0]) + abs(p[1] - goal[1]) + 0.5 * visits.get(p, 0)
+                    if d < best[0]:
+                        best = (d, new_path)
+                    nxt.append((pred, p, new_path))
+            frontier = nxt
+        return best[1], calls
+
+    def execute_plan(self, env, max_steps: int = 30) -> Dict[str, Any]:
+        obs, info = env.reset()
+        trajectory = [info["pos"]]
+        actions: List[int] = []
+        blocked: set = set()
+        visits: Dict[Tuple[int, int], int] = {info["pos"]: 1}
+        observed: Dict[Tuple[int, int], torch.Tensor] = {info["pos"]: obs}
+        correct_predictions = 0
+        wm_calls = 0
+        invalid = 0
+        success = False
+        for _ in range(max_steps):
+            path, calls = self.imagine_path(obs, blocked, visits, observed)
+            wm_calls += calls
+            a = path[0] if path else self.actions[0]
+            with torch.no_grad():
+                predicted = self._pos(self.wm(obs.unsqueeze(0), torch.tensor([a]))[0][0])
+            before = env.current_pos
+            obs, _, done, step_info = env.step(a)
+            actions.append(a)
+            trajectory.append(step_info["pos"])
+            visits[step_info["pos"]] = visits.get(step_info["pos"], 0) + 1
+            observed[step_info["pos"]] = obs
+            correct_predictions += int(predicted == step_info["pos"])
+            if not step_info["valid_action"]:
+                invalid += 1
+                blocked.add((before, a))
+            if step_info["reached_goal"]:
+                success = True
+                break
+            if done:
+                break
+        return {
+            "success": success,
+            "steps": len(actions),
+            "invalid_actions": invalid,
+            "trajectory": trajectory,
+            "actions": actions,
+            "prediction_accuracy": round(correct_predictions / max(1, len(actions)), 4),
+            "world_model_calls": wm_calls,
+        }

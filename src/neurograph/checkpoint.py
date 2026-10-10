@@ -56,3 +56,42 @@ def load_checkpoint(
         "metrics": checkpoint.get("metrics", {}),
         "config": checkpoint.get("config", None),
     }
+
+
+def check_compatibility(path: Path | str, model: nn.Module) -> Dict[str, Any]:
+    """Compare a checkpoint's tensors with ``model`` without modifying the model.
+
+    Returns a report with ``compatible`` (bool), counts of missing/unexpected keys and
+    shape mismatches, and a human-readable ``reason``. A checkpoint is compatible only
+    when every key matches in name and shape.
+    """
+    path = Path(path)
+    report: Dict[str, Any] = {"path": str(path), "exists": path.exists(), "compatible": False}
+    if not path.exists():
+        report["reason"] = "checkpoint file not found"
+        return report
+    try:
+        ckpt = torch.load(path, map_location="cpu", weights_only=False)
+    except Exception as exc:  # corrupt / unreadable file
+        report["reason"] = f"unreadable checkpoint: {type(exc).__name__}: {exc}"
+        return report
+    sd = ckpt.get("model_state_dict", ckpt) if isinstance(ckpt, dict) else {}
+    own = model.state_dict()
+    missing = [k for k in own if k not in sd]
+    unexpected = [k for k in sd if k not in own]
+    mismatched = [k for k in own if k in sd and tuple(sd[k].shape) != tuple(own[k].shape)]
+    report.update(
+        missing_keys=len(missing),
+        unexpected_keys=len(unexpected),
+        shape_mismatches=len(mismatched),
+        example_mismatch=(
+            f"{mismatched[0]}: ckpt {tuple(sd[mismatched[0]].shape)} vs model {tuple(own[mismatched[0]].shape)}"
+            if mismatched else None
+        ),
+        step=ckpt.get("step") if isinstance(ckpt, dict) else None,
+    )
+    report["compatible"] = not (missing or unexpected or mismatched)
+    report["reason"] = "all tensors match" if report["compatible"] else (
+        f"{len(missing)} missing, {len(unexpected)} unexpected, {len(mismatched)} shape-mismatched tensors"
+    )
+    return report
