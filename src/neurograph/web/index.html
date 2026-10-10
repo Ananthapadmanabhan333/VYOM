@@ -2202,28 +2202,19 @@ function appendMessage(role, text, imageB64 = null) {
     }
 
     
-    function appendAssistantMessage(text, stats, telemetry, modeLabel) {
+        function appendAssistantMessage() {
         const list = document.getElementById('messagesList');
         const div = document.createElement('div');
         div.className = 'message assistant';
-        const parsedMarkdown = renderVyomMarkdown(text);
         
-        let footerHtml = '';
-        if (stats) {
-            const steps = telemetry && telemetry.steps_executed ? telemetry.steps_executed : 0;
-            const ms = stats.total_ms ? stats.total_ms.toFixed(1) : 0;
-            const source = stats.condition || modeLabel || "Flash";
-            footerHtml = `<div style="font-size: 0.7rem; color: var(--text-dim); text-align: right; margin-top: 4px;">${source} • ${steps} steps • ${ms} ms</div>`;
-        }
-
         div.innerHTML = `
           <div class="avatar vyom-av"><img src="/vyom_logo.png" alt="VYOM" class="avatar-logo-img"></div>
           <div class="message-content-wrapper">
-            <div class="msg-body">${parsedMarkdown}</div>
-            ${footerHtml}
+            <div class="msg-body"></div>
+            <div class="msg-footer"></div>
             <!-- Action Bar -->
-            <div class="msg-actions">
-              <button class="action-icon-btn" onclick="speakText(\`${text.replace(/[`\\']/g, '')}\`, this)" title="Read aloud">
+            <div class="msg-actions" style="display:none;">
+              <button class="action-icon-btn listen-btn" title="Read aloud">
                 <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                 <span>Listen</span>
               </button>
@@ -2232,6 +2223,13 @@ function appendMessage(role, text, imageB64 = null) {
         `;
         list.appendChild(div);
         list.scrollTop = list.scrollHeight;
+        
+        return {
+            bodyEl: div.querySelector('.msg-body'),
+            footerEl: div.querySelector('.msg-footer'),
+            actionsEl: div.querySelector('.msg-actions'),
+            listenBtn: div.querySelector('.listen-btn')
+        };
     }
 
 function copyFullMessage(btn) {
