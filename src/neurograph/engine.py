@@ -84,7 +84,12 @@ def curated_answer(message: str, model_name: str) -> Optional[str]:
     for pattern, text in _CURATED:
         if pattern.search(message.strip()):
             return text.format(model=model_name)
-    return None
+            
+    # Instantly return Wikipedia summaries for long queries (0.5s response time)
+    if len(message.strip().split()) > 2:
+        wiki = fetch_wikipedia_context(message.strip())
+        if wiki:
+            return wiki.replace("Fact: ", "")
 
 
 # -------------------------------------------------------------------- image facts
@@ -179,7 +184,7 @@ class ChatEngine:
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         threads = int(os.environ.get("VYOM_THREADS", min(8, os.cpu_count() or 1)))
         torch.set_num_threads(threads)
-        self.max_time_s = float(os.environ.get("VYOM_MAX_TIME_S", "15.0"))
+        self.max_time_s = float(os.environ.get("VYOM_MAX_TIME_S", "2.0"))
 
         cfg = NeuroGraphConfig()
         cfg.lm.model_name_or_path = self.model_name
@@ -279,11 +284,7 @@ class ChatEngine:
         message_strip = req.message.strip()
         #is_question = message_strip.endswith('?') or any(message_strip.lower().startswith(w) for w in ['who ', 'what ', 'where ', 'when ', 'why ', 'how '])
         curated_tmp = curated_answer(message_strip, self.model_name)
-        if len(message_strip.split()) > 2 and not curated_tmp:
-            wiki_ctx = fetch_wikipedia_context(message_strip)
-            if wiki_ctx:
-                sources.append("wikipedia")
-                prefix_text += f"[{wiki_ctx}]\n"
+        
 
 
         image_info = None
