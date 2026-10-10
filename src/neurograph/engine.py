@@ -84,14 +84,7 @@ def curated_answer(message: str, model_name: str) -> Optional[str]:
     for pattern, text in _CURATED:
         if pattern.search(message.strip()):
             return text.format(model=model_name)
-            
-    # Instantly return Wikipedia summaries for long queries (0.5s response time)
-    if len(message.strip().split()) > 2:
-        wiki = fetch_wikipedia_context(message.strip())
-        if wiki:
-            return wiki.replace("Fact: ", "")
-
-
+    return None
 # -------------------------------------------------------------------- image facts
 def inspect_image(raw: bytes, max_pixels: int = 40_000_000) -> Dict[str, Any]:
     """Measured image properties. Raises ValueError on invalid/oversized images."""
@@ -150,7 +143,7 @@ class ChatRequestData:
     mode: str = "fast"
     temperature: float = 0.7
     top_p: float = 0.9
-    max_new_tokens: int = 64
+    max_new_tokens: int = 256
     repetition_penalty: float = 1.15
     do_sample: bool = True
     memories: Optional[List[Dict[str, Any]]] = None
@@ -158,22 +151,6 @@ class ChatRequestData:
     seed: Optional[int] = None
 
 
-
-def fetch_wikipedia_context(query: str) -> str:
-    import urllib.request, urllib.parse, json
-    try:
-        url = f'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json'
-        req = urllib.request.Request(url, headers={'User-Agent': 'VyomBot/1.0'})
-        with urllib.request.urlopen(req, timeout=1.0) as response:
-            data = json.loads(response.read())
-            if data['query']['search']:
-                snippet = data['query']['search'][0]['snippet']
-                # clean up HTML tags
-                snippet = re.sub('<[^<]+>', '', snippet)
-                return f"Fact: {snippet}"
-    except Exception:
-        pass
-    return ""
 
 class ChatEngine:
     def __init__(self, model_name: Optional[str] = None, checkpoint: Optional[str] = None):
@@ -184,7 +161,7 @@ class ChatEngine:
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         threads = int(os.environ.get("VYOM_THREADS", min(8, os.cpu_count() or 1)))
         torch.set_num_threads(threads)
-        self.max_time_s = float(os.environ.get("VYOM_MAX_TIME_S", "2.0"))
+        self.max_time_s = float(os.environ.get("VYOM_MAX_TIME_S", "30.0"))
 
         cfg = NeuroGraphConfig()
         cfg.lm.model_name_or_path = self.model_name
