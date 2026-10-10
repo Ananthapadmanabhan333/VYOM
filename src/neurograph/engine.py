@@ -6,7 +6,7 @@ its ``source`` (``model``, ``curated``, ``image_metadata``). Nothing is invented
 
 Environment variables
 ---------------------
-VYOM_MODEL            HF model id/path or ``mock`` (default ``microsoft/DialoGPT-small``)
+VYOM_MODEL            HF model id/path or ``mock`` (default ``HuggingFaceTB/SmolLM2-135M-Instruct``)
 VYOM_CHECKPOINT       optional NeuroGraph checkpoint to load (only if fully compatible)
 VYOM_ALLOW_DOWNLOAD   ``1`` to allow Hugging Face downloads (default: offline only)
 VYOM_THREADS          torch CPU threads (default: min(8, cpu_count))
@@ -59,7 +59,7 @@ MAX_PROMPT_TOKENS = 256
 # itself. These are labelled `source: curated` in the API and UI.
 _CURATED: List[tuple] = [
     (re.compile(r"^\s*(who|what)\s+(are|r)\s+(you|u)\b|^\s*what('?s| is)\s+your\s+name|introduce yourself", re.I),
-     "I'm **Vyom** — an open-source research platform exploring machine cognition with a dynamic "
+     "I'm **Vyom** â€” an open-source research platform exploring machine cognition with a dynamic "
      "graph workspace, user-controlled memory and model-based planning. My replies come from a small "
      "local language model ({model}), so my general knowledge and reasoning are limited. "
      "Open the *Status* panel to see exactly which components are active."),
@@ -128,9 +128,9 @@ def inspect_image(raw: bytes, max_pixels: int = 40_000_000) -> Dict[str, Any]:
 def describe_image_facts(info: Dict[str, Any]) -> str:
     colors = ", ".join(f"`{d['hex']}` ({d['share']*100:.0f}%)" for d in info["dominant_colors"])
     return (
-        "**Image received — measured properties** (no vision model is loaded, so I can't tell you "
+        "**Image received â€” measured properties** (no vision model is loaded, so I can't tell you "
         "what the image depicts):\n\n"
-        f"- Size: {info['width']} × {info['height']} px, format {info['format']}, mode {info['mode']}, "
+        f"- Size: {info['width']} Ã— {info['height']} px, format {info['format']}, mode {info['mode']}, "
         f"{info['bytes']/1024:.1f} KB\n"
         f"- Mean brightness: {info['mean_luminance']} / 255 (std {info['luminance_stddev']})\n"
         f"- Dominant colours: {colors}"
@@ -153,10 +153,27 @@ class ChatRequestData:
     seed: Optional[int] = None
 
 
+
+def fetch_wikipedia_context(query: str) -> str:
+    import urllib.request, urllib.parse, json
+    try:
+        url = f'https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch={urllib.parse.quote(query)}&utf8=&format=json'
+        req = urllib.request.Request(url, headers={'User-Agent': 'VyomBot/1.0'})
+        with urllib.request.urlopen(req, timeout=1.0) as response:
+            data = json.loads(response.read())
+            if data['query']['search']:
+                snippet = data['query']['search'][0]['snippet']
+                # clean up HTML tags
+                snippet = re.sub('<[^<]+>', '', snippet)
+                return f"Fact: {snippet}"
+    except Exception:
+        pass
+    return ""
+
 class ChatEngine:
     def __init__(self, model_name: Optional[str] = None, checkpoint: Optional[str] = None):
         t0 = time.perf_counter()
-        self.model_name = model_name or os.environ.get("VYOM_MODEL", "microsoft/DialoGPT-small")
+        self.model_name = model_name or os.environ.get("VYOM_MODEL", "HuggingFaceTB/SmolLM2-135M-Instruct")
         if os.environ.get("VYOM_ALLOW_DOWNLOAD", "0") != "1":
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
@@ -256,7 +273,18 @@ class ChatEngine:
         mode = MODES[req.mode]
         t0 = time.perf_counter()
         sources: List[str] = []
+
         prefix_text = ""
+        wiki_ctx = ""
+        message_strip = req.message.strip()
+        is_question = message_strip.endswith('?') or any(message_strip.lower().startswith(w) for w in ['who ', 'what ', 'where ', 'when ', 'why ', 'how '])
+        curated_tmp = curated_answer(message_strip, self.model_name)
+        if is_question and not curated_tmp:
+            wiki_ctx = fetch_wikipedia_context(message_strip)
+            if wiki_ctx:
+                sources.append("wikipedia")
+                prefix_text += f"[{wiki_ctx}]\n"
+
 
         image_info = None
         if req.image_bytes is not None:
